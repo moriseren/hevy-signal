@@ -10,9 +10,8 @@ Hevy Signal is a local training-analysis companion for Hevy. Hevy remains your w
 
 On the release page, choose the file for your computer:
 
-- **Windows x64** — for almost all Intel/AMD Windows PCs.
-- **Windows ARM64** — for Windows-on-ARM / Snapdragon PCs.
-- **Mac Apple Silicon** — for M1, M2, M3, M4, and newer Apple Silicon Macs.
+- **Windows** — download `hevy-signal-v3.1-windows-all.zip`. It contains both x64 (Intel/AMD) and ARM64 builds; use the folder matching your PC.
+- **Mac Apple Silicon** — download `Hevy.Signal.app.zip` for M1, M2, M3, M4, and newer Apple Silicon Macs.
 
 You do **not** need Google Drive, Python, Node, Xcode, or an OpenAI API key. The downloadable builds are hosted directly by GitHub Releases.
 
@@ -39,8 +38,8 @@ A Hevy Pro account with access to Hevy's developer API key is required for synci
 
 ### Windows
 
-1. Open the [latest release](https://github.com/moriseren/hevy-signal/releases/latest) and download the Windows x64 ZIP for a normal Intel/AMD Windows PC, or ARM64 for Windows-on-ARM.
-2. Unzip it to a normal folder.
+1. Open the [latest release](https://github.com/moriseren/hevy-signal/releases/latest) and download `hevy-signal-v3.1-windows-all.zip`.
+2. Unzip it and open the `windows-x64` folder for almost all Intel/AMD Windows PCs, or `windows-arm64` for a Windows-on-ARM / Snapdragon PC.
 3. Double-click `HevySignal.exe`.
 4. Windows SmartScreen may warn because the public beta is not code-signed yet. Only choose **More info → Run anyway** if you downloaded it from this repository's release page.
 5. In Hevy, open **Settings → Developer** and copy your API key.
@@ -50,7 +49,7 @@ A Hevy Pro account with access to Hevy's developer API key is required for synci
 
 ### macOS
 
-Open the [latest release](https://github.com/moriseren/hevy-signal/releases/latest), download the Apple Silicon ZIP, unzip it, and open `Hevy Signal.app`. Because the beta is unsigned, macOS may require Control-click → **Open** the first time.
+Open the [latest release](https://github.com/moriseren/hevy-signal/releases/latest), download `Hevy.Signal.app.zip`, unzip it, and open `Hevy Signal.app`. Because the beta is unsigned, macOS may require Control-click → **Open** the first time.
 
 ## ChatGPT handoff
 
@@ -68,14 +67,14 @@ Hevy Signal runs locally. Your Hevy API key, synced workout/routine data, and ex
 
 See [PRIVACY.md](PRIVACY.md) for more detail.
 
-## Development
+## Source and development
 
-The app is written in Go with an embedded vanilla HTML/CSS/JavaScript frontend.
+The app is written in Go with an embedded vanilla HTML/CSS/JavaScript frontend. The repository contains the application source, tests, frontend assets, and macOS launcher source; compiled release binaries stay on the GitHub Releases page.
 
-Run tests with:
+Run the application tests with:
 
 ```bash
-go test ./...
+go test main.go main_test.go
 ```
 
 The public beta is intentionally simple: no external database, no OpenAI SDK, and no package-manager runtime is required for end users.
