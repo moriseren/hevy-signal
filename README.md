@@ -4,6 +4,20 @@ Hevy Signal is a local training-analysis companion for Hevy. Hevy remains your w
 
 > Public beta. Independent project; not affiliated with or endorsed by Hevy.
 
+## Download
+
+**[Download the latest Hevy Signal release](https://github.com/moriseren/hevy-signal/releases/latest)**
+
+On the release page, choose the file for your computer:
+
+- **Windows x64** — for almost all Intel/AMD Windows PCs.
+- **Windows ARM64** — for Windows-on-ARM / Snapdragon PCs.
+- **Mac Apple Silicon** — for M1, M2, M3, M4, and newer Apple Silicon Macs.
+
+You do **not** need Google Drive, Python, Node, Xcode, or an OpenAI API key. The downloadable builds are hosted directly by GitHub Releases.
+
+Because the public beta is not code-signed yet, Windows SmartScreen or macOS Gatekeeper may show an unknown-developer warning. Only bypass that warning when the app was downloaded from this repository's official Releases page.
+
 ## What it does
 
 - Focuses analysis on exercises that are actually in your current Hevy routines.
@@ -25,7 +39,7 @@ A Hevy Pro account with access to Hevy's developer API key is required for synci
 
 ### Windows
 
-1. Download the current Windows x64 release for a normal Intel/AMD Windows PC, or ARM64 for Windows-on-ARM.
+1. Open the [latest release](https://github.com/moriseren/hevy-signal/releases/latest) and download the Windows x64 ZIP for a normal Intel/AMD Windows PC, or ARM64 for Windows-on-ARM.
 2. Unzip it to a normal folder.
 3. Double-click `HevySignal.exe`.
 4. Windows SmartScreen may warn because the public beta is not code-signed yet. Only choose **More info → Run anyway** if you downloaded it from this repository's release page.
@@ -36,7 +50,7 @@ A Hevy Pro account with access to Hevy's developer API key is required for synci
 
 ### macOS
 
-The current macOS beta targets Apple Silicon. Unzip the release and open `Hevy Signal.app`. Because the beta is unsigned, macOS may require Control-click → **Open** the first time.
+Open the [latest release](https://github.com/moriseren/hevy-signal/releases/latest), download the Apple Silicon ZIP, unzip it, and open `Hevy Signal.app`. Because the beta is unsigned, macOS may require Control-click → **Open** the first time.
 
 ## ChatGPT handoff
 
