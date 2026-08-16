@@ -10,8 +10,10 @@
 - CSV mode infers current-program routine cards from the latest occurrence of recent workout names because Hevy workout exports do not contain saved routine definitions.
 - CSV-derived routine cards and ChatGPT briefs are explicitly marked **inferred** rather than presented as direct routine syncs.
 - CSV files are parsed locally and are not uploaded to a Hevy Signal cloud service.
-- Added CSV-specific tests plus normal/race test coverage and runtime import validation.
-- Rebuilt Windows x64, Windows ARM64, and macOS Apple Silicon packages.
+- Optimized CSV header normalization by reusing a single `strings.Replacer` instead of rebuilding it during field lookup.
+- On the 60,000-set stress fixture, CSV import improved from roughly 1.3–1.4 s to ~0.40 s and transient allocation volume fell from ~4.65 GB to ~226 MB on the benchmark machine.
+- Added CSV-specific tests plus normal/race test coverage, large-import stress tests, malformed-input checks, concurrent-read/re-import tests, and runtime import validation.
+- Rebuilt Windows x64, Windows ARM64, and macOS Apple Silicon packages from the optimized source.
 
 ## v3.1 Public Beta
 
