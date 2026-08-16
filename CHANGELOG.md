@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.2 Public Beta
+
+- Added **local Hevy workout CSV import** so Hevy Pro is no longer required.
+- Added dual onboarding: Hevy Pro/API sync or free/local CSV import.
+- CSV imports preserve workout title/date, exercise name, working-set index, load, reps, and RPE when exported.
+- Warmup sets are excluded from working-set analysis, matching the API path.
+- Pounds are converted to kilograms when the export provides pounds without kilograms.
+- CSV mode infers current-program routine cards from the latest occurrence of recent workout names because Hevy workout exports do not contain saved routine definitions.
+- CSV-derived routine cards and ChatGPT briefs are explicitly marked **inferred** rather than presented as direct routine syncs.
+- CSV files are parsed locally and are not uploaded to a Hevy Signal cloud service.
+- Added CSV-specific tests plus normal/race test coverage and runtime import validation.
+- Rebuilt Windows x64, Windows ARM64, and macOS Apple Silicon packages.
+
 ## v3.1 Public Beta
 
 - Added polished Windows x64 and Windows ARM64 builds.
