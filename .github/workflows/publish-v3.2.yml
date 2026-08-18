@@ -1,0 +1,119 @@
+name: Publish optimized v3.2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v3.2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-14
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Restore optimized v3.2 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, glob, pathlib
+          parts = sorted(glob.glob('release-staging/source.part*.b64'))
+          if len(parts) != 7:
+              raise SystemExit(f'expected 7 source chunks, found {len(parts)}')
+          data = ''.join(pathlib.Path(p).read_text().strip() for p in parts)
+          pathlib.Path('Hevy-Signal-v3.2-source.zip').write_bytes(base64.b64decode(data))
+          PY
+          mkdir -p build-src
+          ditto -x -k Hevy-Signal-v3.2-source.zip build-src
+          test -f build-src/Hevy-Signal-v3.2-source/main.go
+
+      - name: Test optimized source
+        working-directory: build-src/Hevy-Signal-v3.2-source
+        run: go test main.go main_test.go
+
+      - name: Build release packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$PWD/build-src/Hevy-Signal-v3.2-source"
+          DIST="$PWD/dist"
+          mkdir -p "$DIST/windows-x64" "$DIST/windows-arm64" "$DIST/windows-all/windows-x64" "$DIST/windows-all/windows-arm64"
+
+          cd "$SRC"
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -H=windowsgui' -o "$DIST/windows-x64/HevySignal.exe" main.go
+          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -H=windowsgui' -o "$DIST/windows-arm64/HevySignal.exe" main.go
+          cp "$DIST/windows-x64/HevySignal.exe" "$DIST/windows-all/windows-x64/HevySignal.exe"
+          cp "$DIST/windows-arm64/HevySignal.exe" "$DIST/windows-all/windows-arm64/HevySignal.exe"
+
+          cat > "$DIST/windows-x64/README-FIRST.txt" <<'EOF'
+          Hevy Signal v3.2 Public Beta — Windows x64
+
+          1. Unzip this folder.
+          2. Double-click HevySignal.exe.
+          3. Use either your own Hevy Pro API key for automatic sync, or Import Hevy CSV for local analysis without Hevy Pro.
+
+          Hevy Signal stores training data locally. It does not contain the developer's Hevy API key and does not require an OpenAI API key.
+          Independent project; not affiliated with or endorsed by Hevy.
+          EOF
+          cp "$DIST/windows-x64/README-FIRST.txt" "$DIST/windows-arm64/README-FIRST.txt"
+          cp "$DIST/windows-x64/README-FIRST.txt" "$DIST/windows-all/README-FIRST.txt"
+
+          APP="$DIST/Hevy Signal.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "$APP/Contents/Resources/HevySignalBackend" main.go
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "$APP/Contents/MacOS/HevySignalLauncher" cmd/macos-launcher/main.go
+          chmod 755 "$APP/Contents/MacOS/HevySignalLauncher" "$APP/Contents/Resources/HevySignalBackend"
+          cat > "$APP/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key><string>HevySignalLauncher</string>
+            <key>CFBundleIdentifier</key><string>com.hevysignal.local</string>
+            <key>CFBundleName</key><string>Hevy Signal</string>
+            <key>CFBundleDisplayName</key><string>Hevy Signal</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>3.2</string>
+            <key>CFBundleVersion</key><string>3.2</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>LSArchitecturePriority</key><array><string>arm64</string></array>
+          </dict>
+          </plist>
+          EOF
+
+          cd "$DIST/windows-x64" && zip -q -r "$DIST/Hevy-Signal-v3.2-Windows-x64.zip" .
+          cd "$DIST/windows-arm64" && zip -q -r "$DIST/Hevy-Signal-v3.2-Windows-ARM64.zip" .
+          cd "$DIST/windows-all" && zip -q -r "$DIST/Hevy-Signal-v3.2-Windows-all.zip" .
+          cd "$DIST" && ditto -c -k --sequesterRsrc --keepParent 'Hevy Signal.app' Hevy-Signal-v3.2-macOS-Apple-Silicon.zip
+          cp "$GITHUB_WORKSPACE/Hevy-Signal-v3.2-source.zip" "$DIST/Hevy-Signal-v3.2-source.zip"
+          cd "$DIST"
+          shasum -a 256 Hevy-Signal-v3.2-Windows-all.zip Hevy-Signal-v3.2-Windows-x64.zip Hevy-Signal-v3.2-Windows-ARM64.zip Hevy-Signal-v3.2-macOS-Apple-Silicon.zip Hevy-Signal-v3.2-source.zip > Hevy-Signal-v3.2-SHA256.txt
+
+      - name: Create or update v3.2 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view v3.2 >/dev/null 2>&1; then
+            gh release create v3.2 --target main --title 'Hevy Signal v3.2 Public Beta' --notes 'Hevy Signal v3.2 Public Beta — local CSV import without Hevy Pro, optional Hevy Pro API sync, and optimized CSV import performance.'
+          fi
+          gh release upload v3.2 \
+            dist/Hevy-Signal-v3.2-Windows-all.zip \
+            dist/Hevy-Signal-v3.2-Windows-x64.zip \
+            dist/Hevy-Signal-v3.2-Windows-ARM64.zip \
+            dist/Hevy-Signal-v3.2-macOS-Apple-Silicon.zip \
+            dist/Hevy-Signal-v3.2-source.zip \
+            dist/Hevy-Signal-v3.2-SHA256.txt \
+            --clobber
+
+      - name: Verify published assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view v3.2 --json tagName,name,isDraft,isPrerelease,assets
