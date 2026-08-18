@@ -1,0 +1,1 @@
+Trigger the v3.2 release verification workflow from a branch created after the verifier existed on main.
