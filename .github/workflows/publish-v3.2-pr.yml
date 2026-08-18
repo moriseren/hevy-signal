@@ -9,28 +9,41 @@ permissions:
 
 jobs:
   publish:
-    if: github.head_ref == 'publish-v3.2-now'
+    if: github.head_ref == 'publish-v3.2-final'
     runs-on: macos-14
     env:
       GH_TOKEN: ${{ github.token }}
+      EXPECTED_SOURCE_SHA256: 93077dbd213ba86a3bfeab46d3299439085eb2c4a3dbe8dcab109077c9127136
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Restore optimized source
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Restore and verify optimized source
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import base64, glob, pathlib
-          parts = sorted(glob.glob('release-staging/source.part*.b64'))
-          if len(parts) != 7:
-              raise SystemExit(f'expected 7 source chunks, found {len(parts)}')
-          data = ''.join(pathlib.Path(p).read_text().strip() for p in parts)
-          pathlib.Path('Hevy-Signal-v3.2-source.zip').write_bytes(base64.b64decode(data))
+          import base64, glob, hashlib, pathlib
+          parts = sorted(glob.glob('release-staging/optimized.part*.b64'))
+          if len(parts) != 4:
+              raise SystemExit(f'expected 4 optimized source chunks, found {len(parts)}')
+          encoded = ''.join(pathlib.Path(p).read_text().strip() for p in parts)
+          raw = base64.b64decode(encoded, validate=True)
+          actual = hashlib.sha256(raw).hexdigest()
+          expected = '93077dbd213ba86a3bfeab46d3299439085eb2c4a3dbe8dcab109077c9127136'
+          if actual != expected:
+              raise SystemExit(f'source checksum mismatch: {actual}')
+          pathlib.Path('Hevy-Signal-v3.2-source.zip').write_bytes(raw)
+          print(f'optimized source verified: {actual}')
           PY
+          unzip -t Hevy-Signal-v3.2-source.zip
           mkdir -p build-src
-          ditto -x -k Hevy-Signal-v3.2-source.zip build-src
+          unzip -q Hevy-Signal-v3.2-source.zip -d build-src
           test -f build-src/Hevy-Signal-v3.2-source/main.go
 
       - name: Test source
@@ -108,8 +121,20 @@ jobs:
             dist/Hevy-Signal-v3.2-SHA256.txt \
             --clobber
 
-      - name: Verify release
+      - name: Verify release assets
         shell: bash
         run: |
           set -euo pipefail
+          release="$(gh api repos/${{ github.repository }}/releases/tags/v3.2)"
+          for name in \
+            Hevy-Signal-v3.2-Windows-all.zip \
+            Hevy-Signal-v3.2-Windows-x64.zip \
+            Hevy-Signal-v3.2-Windows-ARM64.zip \
+            Hevy-Signal-v3.2-macOS-Apple-Silicon.zip \
+            Hevy-Signal-v3.2-source.zip \
+            Hevy-Signal-v3.2-SHA256.txt; do
+            echo "$release" | jq -e --arg n "$name" '.assets[] | select(.name == $n and .state == "uploaded")' >/dev/null
+          done
+          digest="$(echo "$release" | jq -r '.assets[] | select(.name == "Hevy-Signal-v3.2-source.zip") | .digest // empty')"
+          test "$digest" = "sha256:$EXPECTED_SOURCE_SHA256"
           gh release view v3.2 --json tagName,name,isDraft,isPrerelease,assets
