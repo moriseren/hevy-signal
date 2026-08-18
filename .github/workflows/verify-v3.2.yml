@@ -1,0 +1,33 @@
+name: Verify v3.2 release publisher
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_SOURCE_SHA256: 93077dbd213ba86a3bfeab46d3299439085eb2c4a3dbe8dcab109077c9127136
+    steps:
+      - name: Verify optimized v3.2 release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="$(gh api repos/${{ github.repository }}/releases/tags/v3.2)"
+          for name in \
+            Hevy-Signal-v3.2-Windows-all.zip \
+            Hevy-Signal-v3.2-Windows-x64.zip \
+            Hevy-Signal-v3.2-Windows-ARM64.zip \
+            Hevy-Signal-v3.2-macOS-Apple-Silicon.zip \
+            Hevy-Signal-v3.2-source.zip \
+            Hevy-Signal-v3.2-SHA256.txt; do
+            echo "$release" | jq -e --arg n "$name" '.assets[] | select(.name == $n and .state == "uploaded")' >/dev/null
+          done
+          digest="$(echo "$release" | jq -r '.assets[] | select(.name == "Hevy-Signal-v3.2-source.zip") | .digest // empty')"
+          test "$digest" = "sha256:$EXPECTED_SOURCE_SHA256"
+          echo "v3.2 optimized release assets verified."
