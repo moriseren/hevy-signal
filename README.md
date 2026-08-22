@@ -17,6 +17,19 @@ You do **not** need Google Drive, Python, Node, Xcode, or an OpenAI API key. Bui
 
 Because the public beta is not code-signed yet, Windows SmartScreen or macOS Gatekeeper may show an unknown-developer warning. Only bypass that warning for a copy downloaded from this repository's official Releases page.
 
+## iPhone / mobile web app
+
+A pure browser version lives in [`docs/`](docs/) and is designed for iPhone Safari and other modern mobile browsers.
+
+- Uses **local Hevy CSV import** — no Hevy Pro API key is required.
+- Has no Hevy Signal backend or cloud database.
+- Imported workout data is parsed in the browser and stored in IndexedDB on that device.
+- Infers recent workout templates from completed workout history because Hevy CSV exports do not include saved-routine definitions.
+- Generates a local ChatGPT Training Brief that you can copy or share yourself.
+- Supports **Safari → Share → Add to Home Screen** for an app-like standalone experience once served through GitHub Pages.
+
+The included GitHub Pages workflow publishes the `docs/` folder after Pages is enabled for this repository.
+
 ## Hevy Pro is optional in v3.2
 
 Hevy Signal now supports two data-source modes.
@@ -75,15 +88,17 @@ The Hevy API key is never included in the training brief.
 
 Hevy Signal runs locally. Your Hevy API key (if you use one), workout data, inferred/synced program state, and exercise mappings are stored in the app's local user-data directory. The app contacts Hevy only when you explicitly test or sync through the Pro/API path. CSV imports are parsed locally.
 
+The mobile web build does not use a Hevy API key at all. Its imported CSV data is stored in the browser on the device.
+
 See [PRIVACY.md](PRIVACY.md) for more detail.
 
 ## Development
 
-The app is written in Go with an embedded vanilla HTML/CSS/JavaScript frontend. A complete v3.2 source archive is provided with the release while the public repository source tree is being normalized.
+The desktop app is written in Go with an embedded vanilla HTML/CSS/JavaScript frontend. The mobile build under `docs/` is pure client-side HTML/CSS/JavaScript so it can run directly in Safari without a local Go process.
 
 ## Release status
 
-Current releases are unsigned public-beta builds with manual updates. Code signing/notarization is not yet configured, so Windows SmartScreen and macOS Gatekeeper warnings are expected.
+Current desktop releases are unsigned public-beta builds with manual updates. Code signing/notarization is not yet configured, so Windows SmartScreen and macOS Gatekeeper warnings are expected.
 
 ## Disclaimer
 
