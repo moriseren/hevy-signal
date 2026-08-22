@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0d10" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hevy Signal" />
+  <title>Hevy Signal Mobile</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">MOBILE · LOCAL CSV</div>
+      <h1>Hevy Signal</h1>
+    </div>
+    <button id="installHint" class="ghost">Add to Home Screen</button>
+  </header>
+
+  <main>
+    <section class="hero card">
+      <h2>Your Hevy history, analyzed on your iPhone.</h2>
+      <p>Import a Hevy workout CSV. Parsing, analysis, mappings, and saved data stay in this browser on this device.</p>
+      <label class="upload" for="csvFile">Import Hevy CSV</label>
+      <input id="csvFile" type="file" accept=".csv,text/csv" hidden />
+      <div id="status" class="status">No data imported yet.</div>
+    </section>
+
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="program">Program</button>
+      <button class="tab" data-tab="exercises">Exercises</button>
+      <button class="tab" data-tab="brief">ChatGPT brief</button>
+      <button class="tab" data-tab="privacy">Privacy</button>
+    </nav>
+
+    <section id="overview" class="panel active"></section>
+    <section id="program" class="panel"></section>
+    <section id="exercises" class="panel"></section>
+    <section id="brief" class="panel"></section>
+    <section id="privacy" class="panel"></section>
+  </main>
+
+  <template id="emptyTemplate"><div class="card empty"><h3>Import a Hevy CSV first</h3><p>Use the button above. Nothing is uploaded to a Hevy Signal server.</p></div></template>
+  <script src="app.js"></script>
+</body>
+</html>
