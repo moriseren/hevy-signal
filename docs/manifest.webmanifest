@@ -1,0 +1,9 @@
+{
+  "name": "Hevy Signal Mobile",
+  "short_name": "Hevy Signal",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0c0d10",
+  "theme_color": "#0c0d10",
+  "description": "Local Hevy CSV training analysis for iPhone and mobile browsers."
+}
