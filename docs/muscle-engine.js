@@ -205,23 +205,45 @@
     else{
       try{
         const items=[];let url=WGER+'?language=2&limit=100&offset=0';let page=0;
-        while(url&&page<25){const data=await timeoutFetch(url);if(!data||!Array.isArray(data.results))throw Error('Unexpected wger API response');items.push(...data.results.map(convertWger).filter(Boolean));page++;
-          url=data.next&&page<25?new URL(data.next,WGER).href:null;
+        while(url&&page<30){const data=await timeoutFetch(url);if(!data||!Array.isArray(data.results))throw Error('Unexpected wger API response');items.push(...data.results.map(convertWger).filter(Boolean));page++;
+          url=data.next&&page<30?new URL(data.next,WGER).href:null;
           if(url&&!url.startsWith('https://wger.de/'))throw Error('Unexpected pagination host');
         }
         if(!items.length)throw Error('No English exercises returned');
         wger=items;write(CACHE_KEY,{when:Date.now(),rows:items});
-        status='wger exercise catalog loaded';onlineError='';
+        status=page>=30&&url?'wger catalog partially loaded (page limit)':'wger exercise catalog loaded';onlineError='';
       }catch(e){onlineError=String(e.message||e);status=wger.length?'wger cached catalog (offline)':'Offline local rules (wger unavailable)';}
     }
     if(useExerciseDB){
+      const seen=new Set(),items=[];
       try{
-        // Only hold in memory; ExerciseDB terms do not allow permanent local storage.
-        const data=await timeoutFetch(EDB,15000);
-        const rows=Array.isArray(data)?data:Array.isArray(data.data)?data.data:Array.isArray(data.results)?data.results:Array.isArray(data.exercises)?data.exercises:[];
-        edb=rows.map(convertEDB).filter(Boolean);
-        if(edb.length)status+=' + ExerciseDB supplemental matches';
-      }catch(e){onlineError+=(onlineError?'; ':'')+'ExerciseDB: '+String(e.message||e);}
+        const pageSize=100,maxPages=18;
+        for(let page=0,offset=0;page<maxPages;page++){
+          // Fetch public catalog pages; do not send personal workout/exercise names.
+          const endpoint=EDB+'?limit='+pageSize+'&offset='+offset;
+          const data=await timeoutFetch(endpoint,15000);
+          const rows=Array.isArray(data)?data:Array.isArray(data.data)?data.data:
+            Array.isArray(data.results)?data.results:Array.isArray(data.exercises)?data.exercises:[];
+          if(!rows.length)break;
+          let added=0;
+          for(const item of rows.map(convertEDB).filter(Boolean)){
+            const id=String(item.id||item.name);
+            if(!seen.has(id)){seen.add(id);items.push(item);added++;}
+          }
+          if(!added)break;
+          offset+=rows.length;
+          const total=Number(data.total??data.count??data.pagination?.total??NaN);
+          if(Number.isFinite(total)&&offset>=total)break;
+          // If the server explicitly says there is no next page, stop.
+          if(data.next===null || data.pagination?.hasNext===false)break;
+          // No reliable end-of-catalog metadata: continue until the final empty page.
+        }
+        edb=items;
+        if(edb.length)status+=' + ExerciseDB '+edb.length+' supplemental records';
+      }catch(e){
+        if(items.length){edb=items;status+=' + ExerciseDB partial catalog ('+items.length+' records)';}
+        onlineError+=(onlineError?'; ':'')+'ExerciseDB: '+String(e.message||e);
+      }
     }
     return {status,wgerCount:wger.length,exerciseDBCount:edb.length,error:onlineError};
   }
