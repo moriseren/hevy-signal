@@ -87,10 +87,66 @@ function renderOverview(){
  $('#refreshCatalog').onclick=()=>refreshCatalog(true);
 }
 function renderProgram(){if(!state.rows.length)return empty('#program');const t=recentTemplates();$('#program').innerHTML=`<div class="card"><h3>Inferred current program</h3><p class="muted small">CSV exports contain completed workouts, not your saved Hevy routines. These cards are inferred from the latest occurrence of recent workout names.</p></div><div class="list" style="margin-top:10px">${t.map(x=>`<div class="row"><div><div class="title">${esc(x.title)}</div><div class="sub">Latest: ${fmtDate(x.date)} · ${x.exercises.length} exercises</div><div class="sub">${x.exercises.map(esc).join(' · ')}</div></div><span class="pill warn">inferred</span></div>`).join('')}</div>`;}
-function renderExercises(){if(!state.rows.length)return empty('#exercises');const stats=exerciseStats();$('#exercises').innerHTML=`<p class="muted small">Tap an exercise to adjust its muscle contributions. Values are fractional set-credit estimates, not a measurement of muscle activation.</p><div class="list">${stats.map(x=>{const r=x.recent[0];return `<div class="row muscle-edit" data-exercise="${esc(x.name)}" tabindex="0" role="button" title="Edit muscle mapping"><div><div class="title">${esc(x.name)}</div><div class="sub">${esc(x.muscle)} · ${x.sets.length} recorded sets</div><div class="sub">Latest: ${r.kg!=null?r.kg.toFixed(1)+' kg × ':''}${r.reps??'—'} reps${r.rpe!=null?' · RPE '+r.rpe:''} · ${fmtDate(r.date)}</div></div><span class="pill ${x.best?'good':''}">${x.best&&x.best.kg!=null?x.best.kg.toFixed(1)+' kg':'history'}</span></div>`}).join('')}</div>`;$('.muscle-edit').forEach(el=>{el.onclick=()=>{try{editMuscle(el.dataset.exercise)}catch(e){alert(e.message)}};el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();el.click()}}});}
-function makeBrief(){if(!state.rows.length)return '';const t=recentTemplates(),stats=exerciseStats().slice(0,40);const first=state.rows[0],last=state.rows.at(-1);return `# Hevy Signal Mobile Training Brief\n\nSource: local Hevy workout CSV imported in the browser.\nImportant: saved Hevy routines are NOT present in the CSV. Program cards below are inferred from recent workout history.\nNo Hevy API key is used by this mobile version.\n\n## Dataset\n- Workouts: ${state.workouts.length}\n- Working sets: ${state.rows.length}\n- Date range: ${fmtDate(first.date)} to ${fmtDate(last.date)}\n- Unique exercises: ${uniq(state.rows.map(x=>x.exercise)).length}\n\n## Inferred recent workout templates\n${t.map(x=>`### ${x.title}\n- Latest occurrence: ${fmtDate(x.date)}\n- Exercises: ${x.exercises.join(', ')}`).join('\n\n')}\n\n## Estimated muscle set credit (all imported working sets)\n${Object.entries(state.rows.reduce((acc,s)=>{for(const [m,w] of contributions(s.exercise))acc[m]=(acc[m]||0)+w;return acc;},{})).sort((a,b)=>b[1]-a[1]).map(([m,v])=>'- '+m+': '+v.toFixed(1)+' effective sets').join('\n')}\n\n## Exercise history summary\n${stats.map(x=>{const r=x.recent[0];return `- ${x.name} (${x.muscle}): ${x.sets.length} sets recorded; latest ${r.kg!=null?r.kg.toFixed(1)+' kg × ':''}${r.reps??'—'} reps${r.rpe!=null?', RPE '+r.rpe:''} on ${fmtDate(r.date)}`}).join('\n')}\n\n## Interpretation rules\n- Treat completed CSV history as evidence, not as authoritative saved-program structure.\n- Do not invent missing routine targets or set prescriptions.\n- Distinguish programmed volume from completed volume.\n- Muscle volumes are fractional estimates based on exercise names and manually corrected mappings, not direct measurements of recruitment.\n- Use trends across multiple exposures rather than rewriting a program from one poor session.\n`;}
+function renderExercises(){
+ if(!state.rows.length)return empty('#exercises');
+ const stats=exerciseStats();
+ $('#exercises').innerHTML=`<p class="muted small">Primary movers, secondary movers and recorded stabilizers are shown separately. Edit any unusual movement; your personal correction overrides the automatic match.</p>
+ <div class="list">${stats.map(x=>{
+  const r=x.recent[0],p=x.profile;
+  return `<div class="row"><div style="flex:1;min-width:0">
+   <div class="title">${esc(x.name)}</div>
+   <div class="sub"><strong>Primary:</strong> ${esc(listText(p.primary))}</div>
+   <div class="sub"><strong>Secondary:</strong> ${esc(listText(p.secondary))}</div>
+   <div class="sub"><strong>Stabilizers:</strong> ${esc(listText(p.stabilizers))}</div>
+   <div class="sub">Source: ${p.source.url?`<a href="${esc(p.source.url)}" target="_blank" rel="noopener noreferrer">${esc(p.source.name)}</a>`:esc(p.source.name)}
+    · Match: ${esc(p.confidence)}${p.matched&&p.matched!==x.name?' · catalog: '+esc(p.matched):''}</div>
+   ${p.note?`<div class="sub">${esc(p.note)}</div>`:''}
+   <div class="sub">${x.sets.length} sets · Latest ${r.kg!=null?r.kg.toFixed(1)+' kg × ':''}${r.reps??'—'} reps${r.rpe!=null?' · RPE '+r.rpe:''} · ${fmtDate(r.date)}</div>
+   <div class="actions" style="margin:7px 0 0"><button class="ghost edit-mapping" data-exercise="${esc(x.name)}">Edit mapping</button><button class="ghost reset-mapping" data-exercise="${esc(x.name)}">Reset</button></div>
+  </div><span class="pill ${p.confidence==='high'||p.confidence==='manual'?'good':p.confidence==='estimated'||p.confidence==='unmapped'?'warn':''}">${esc(p.confidence)}</span></div>`;
+ }).join('')}</div>`;
+ $$('.edit-mapping').forEach(el=>{el.onclick=()=>{try{editMuscle(el.dataset.exercise)}catch(e){alert(e.message)}}});
+ $$('.reset-mapping').forEach(el=>{el.onclick=()=>{PROFILE.clearOverride(el.dataset.exercise);renderAll()}});
+}
+function makeBrief(){
+ if(!state.rows.length)return '';
+ const t=recentTemplates(),stats=exerciseStats(),first=state.rows[0],last=state.rows.at(-1);
+ const counted=PROFILE.count(state.rows,{secondaryCredit}),coverage=catalogSummary();
+ return `# Hevy Signal Mobile Training Brief
+
+Source: locally imported Hevy workout CSV (saved Hevy routines are not present).
+Reference mapping: wger exercise information; optional ExerciseDB free non-commercial API; 2 individually reviewed ExRx examples; manual corrections and transparently labeled estimated fallback rules.
+Match confidence is EXERCISE-NAME matching confidence, not certainty about muscle activation.
+Secondary credit selected by user: ${secondaryCredit*100}% (assumption, not an evidence-validated conversion).
+
+## Dataset
+- Workouts: ${state.workouts.length}
+- Working sets: ${state.rows.length}
+- Date range: ${fmtDate(first.date)} to ${fmtDate(last.date)}
+- Unique exercises: ${stats.length}
+- Exercise mappings requiring review: ${coverage.review+coverage.estimated+coverage.unmapped}
+
+## Recent inferred workout templates
+${t.map(x=>`### ${x.title}
+- Latest: ${fmtDate(x.date)}
+- Exercises: ${x.exercises.join(', ')}`).join('\n\n')}
+
+## Direct set exposures vs secondary involvements, all imported sets
+${Object.entries(counted).sort((a,b)=>b[1].primary-a[1].primary).map(([m,s])=>`- ${m}: ${s.primary} direct sets; ${s.secondary} secondary exposures; ${s.stabilizer} stabilizer mentions; ${s.effective.toFixed(2)} modeled sets`).join('\n')}
+
+## Exercise anatomy classifications and recent history
+${stats.map(x=>{const r=x.recent[0],p=x.profile;return `- ${x.name}: PRIMARY [${p.primary.join(', ')||'unmapped'}]; SECONDARY [${p.secondary.join(', ')||'none listed'}]; STABILIZERS [${p.stabilizers.join(', ')||'not documented'}]; SOURCE ${p.source.name}; CONFIDENCE ${p.confidence}; ${x.sets.length} sets; latest ${r.kg!=null?r.kg.toFixed(1)+' kg × ':''}${r.reps??'—'} reps on ${fmtDate(r.date)}`;}).join('\n')}
+
+## Interpretation
+- Secondary exposure is not equal to a direct hypertrophy set; do not double count without an explicit model.
+- Missing stabilizers or synergists in a database do not imply zero recruitment.
+- Manual exercise setup changes may substantially change emphasis; review custom variants.
+- Database names should not be confused with direct physiological measurements.
+- Distinguish completed workout volume from programmed/routine volume.
+`;
+}
 function renderBrief(){if(!state.rows.length)return empty('#brief');const b=makeBrief();$('#brief').innerHTML=`<div class="actions"><button id="copyBrief" class="primary">Copy brief</button><button id="shareBrief" class="ghost">Share</button></div><textarea id="briefText" readonly></textarea>`;$('#briefText').value=b;$('#copyBrief').onclick=async()=>{await navigator.clipboard.writeText(b);$('#copyBrief').textContent='Copied';setTimeout(()=>$('#copyBrief').textContent='Copy brief',1200)};$('#shareBrief').onclick=async()=>{if(navigator.share)await navigator.share({title:'Hevy Signal Training Brief',text:b});else await navigator.clipboard.writeText(b);};}
-function renderPrivacy(){$('#privacy').innerHTML=`<div class="card privacy-note"><h3>Privacy on iPhone</h3><p>This mobile build has no backend. Your imported CSV is parsed in Safari and saved in IndexedDB on this device. It does not ask for or store a Hevy API key.</p><p>The hosted page must be downloaded from GitHub Pages so Safari can run it, but your workout CSV contents are not sent to Hevy Signal when you import them.</p><p>The ChatGPT brief stays local until you copy/share it yourself.</p><button id="clearLocal" class="ghost danger">Delete local mobile data</button></div>`;$('#clearLocal').onclick=clearData;}
+function renderPrivacy(){$('#privacy').innerHTML=`<div class="card privacy-note"><h3>Privacy on iPhone</h3><p>This mobile build has no backend. Your imported CSV is saved on this device in IndexedDB; no Hevy API key is required. Anatomy catalog lookups contact wger and optionally ExerciseDB, but do not send workout rows or exercise names.</p><p>The hosted page must be downloaded from GitHub Pages so Safari can run it, but your workout CSV contents are not sent to Hevy Signal when you import them.</p><p>wger exercise data have individual Creative Commons licenses, credited to <a href="https://wger.de" target="_blank" rel="noopener noreferrer">wger</a>. Optional ExerciseDB free data are for non-commercial use with <a href="https://oss.exercisedb.dev/docs" target="_blank" rel="noopener noreferrer">AscendAPI</a> attribution; the app does not permanently cache its results. Only specific ExRx examples are linked. The ChatGPT brief stays local until you copy/share it yourself.</p><button id="clearLocal" class="ghost danger">Delete local mobile data</button></div>`;$('#clearLocal').onclick=clearData;}
 function empty(sel){$(sel).innerHTML=$('#emptyTemplate').innerHTML;}
 function renderAll(){renderOverview();renderProgram();renderExercises();renderBrief();renderPrivacy();}
 $('#csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;$('#status').textContent='Importing…';try{const text=await f.text();state.rows=importHevy(text);state.source='csv';rebuild();await saveData();}catch(err){$('#status').textContent='Import failed: '+err.message;}finally{e.target.value='';}});
