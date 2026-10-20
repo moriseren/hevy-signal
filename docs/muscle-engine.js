@@ -53,6 +53,7 @@
   const normMuscle=s=>{
     const v=String(s||'').trim().replace(/\s+/g,' ');
     const n=v.toLowerCase();
+    if(n.startsWith('quads —')||n.startsWith('quads -'))return v;
     if(/gluteus medius|gluteus minimus/.test(n))return 'Glute med/min';
     if(/gluteus maximus/.test(n))return 'Glute max';
     if(/vastus (medialis|lateralis|intermedius)/.test(n))return 'Quads — vasti';
@@ -139,7 +140,7 @@
       const best=options[0],runner=options[1];
       // Avoid guessing if two similarly named but anatomically different records compete.
       if(!runner||best.top-runner.top>=.06 || JSON.stringify(best.item.primary)===JSON.stringify(runner.item.primary)){
-        const source=best.provider===0?{name:'wger',url:'https://wger.de/en/exercise/'+best.item.id}:{name:'ExerciseDB (free API)',url:'https://oss.exercisedb.dev/docs'};
+        const source=best.provider===0?{name:'wger',url:'https://wger.de/api/v2/exerciseinfo/'+best.item.id+'/'}:{name:'ExerciseDB (free API)',url:'https://oss.exercisedb.dev/docs'};
         return pack(best.item.primary,best.item.secondary,[],source,best.top>=.97?'high':best.top>=.88?'medium':'review',best.matched,'Database exercise-name match; stabilizers were not supplied.');
       }
     }
@@ -168,6 +169,8 @@
     return {id:x.exerciseId||x.id,name:x.name,primary,secondary};
   }
   async function sync({useExerciseDB=true,force=false}={}){
+    onlineError='';
+    if(!useExerciseDB)edb=[];
     let record=read(CACHE_KEY,null);
     if(!force&&record&&Date.now()-record.when<7*86400000&&Array.isArray(record.rows)){
       wger=record.rows;status='wger cached catalog';}
