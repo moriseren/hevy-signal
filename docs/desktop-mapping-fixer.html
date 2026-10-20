@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hevy Signal • Desktop Mapping Repair</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}
+body{background:#0c0d10;color:#f4f6fa;margin:0}
+main{max-width:720px;margin:42px auto;padding:18px}
+h1{font-size:1.8rem}
+h2{font-size:1.1rem}
+p{line-height:1.55;color:#b8c0cc}
+.card{background:#181b21;border:1px solid #333944;border-radius:15px;padding:20px;margin:16px 0}
+button,.upload{display:inline-block;color:#0e1116;background:#fff;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;font:inherit;font-weight:700}
+button:disabled{opacity:.45;cursor:not-allowed}
+.notice{color:#f1c579}
+.code{font-family:ui-monospace,monospace;white-space:pre-wrap;font-size:.9rem}
+#details{max-height:300px;overflow-y:auto}
+a{color:#a9d6ff}
+</style></head>
+<body><main>
+<h1>Hevy Signal — repair desktop exercise mappings</h1>
+<p>Repairs recognized <strong>Unmapped</strong> entries in an existing exercise-mappings JSON export. Your workout data and exercise names are processed on this device. No network API requests are made by this repair tool.</p>
+<div class="card">
+<h2>1. Export mappings from the Mac app</h2>
+<p>Open Hevy Signal → Privacy &amp; Data → <strong>Export exercise mappings</strong>. Keep the original export as a backup.</p>
+<h2>2. Select your export</h2>
+<label class="upload">Choose mappings JSON <input id="file" type="file" accept="application/json,.json" style="display:none"></label>
+<p class="notice">This page only changes entries whose major contributors are empty or labeled “Unmapped.” It never replaces an existing muscle classification.</p>
+</div>
+<div class="card">
+<h2>3. Review and save</h2>
+<p id="summary">Choose the export file to start.</p>
+<div id="details" class="code"></div>
+<p><button id="download" disabled>Download repaired JSON</button></p>
+<p>Return to Hevy Signal → Privacy &amp; Data → <strong>Import exercise mappings</strong> and choose your repaired JSON. The app imports mappings only for matching exercise identifiers. Review any estimated mappings in its Exercise setup screen.</p>
+</div>
+<p><a href="https://github.com/moriseren/hevy-signal">Hevy Signal source</a> · Exercise classifications not matched to a verified reference are labeled heuristic estimates.</p>
+</main>
+<script src="muscle-engine.js"></script>
+<script>
+(function(){
+const file=document.querySelector('#file'),summary=document.querySelector('#summary'),details=document.querySelector('#details'),button=document.querySelector('#download');
+let output='';
+function scan(node,visited,report){
+ if(!node||typeof node!=='object'||visited.has(node))return;
+ visited.add(node);
+ if(!Array.isArray(node)){
+  const title=typeof node.exercise_title==='string'?node.exercise_title:typeof node.exerciseTitle==='string'?node.exerciseTitle:null;
+  const major=node.major_muscles??node.majorMuscles;
+  if(title&&('major_muscles' in node||'majorMuscles' in node)){
+   report.found++;
+   const existing=Array.isArray(major)?major:String(major||'').split(',');
+   if(existing.filter(x=>String(x).trim()&&!/^unmapped$/i.test(String(x).trim())).length===0){
+    const candidate=HevyMuscles.profile(title);
+    if(candidate.primary.length&&candidate.confidence!=='unmapped'){
+     if('major_muscles' in node)node.major_muscles=candidate.primary;else node.majorMuscles=candidate.primary;
+     if('supporting_muscles' in node)node.supporting_muscles=candidate.secondary;
+     if('supportingMuscles' in node)node.supportingMuscles=candidate.secondary;
+     report.changed.push({title,primary:candidate.primary,secondary:candidate.secondary,source:candidate.source.name,confidence:candidate.confidence});
+    }else report.remaining.push(title);
+   }
+  }
+ }
+ for(const value of Object.values(node))if(value&&typeof value==='object')scan(value,visited,report);
+}
+file.onchange=async()=>{
+ button.disabled=true;output='';details.textContent='';
+ const f=file.files?.[0];if(!f)return;
+ try{
+  if(f.size>10*1024*1024)throw Error('File is larger than 10 MB; expected a small mappings export.');
+  const json=JSON.parse(await f.text());
+  if(!json||typeof json!=='object')throw Error('Expected a JSON object or array.');
+  const report={found:0,changed:[],remaining:[]};
+  scan(json,new WeakSet(),report);
+  if(!report.found)throw Error('No exercise mapping entries were found. Export mappings from Hevy Signal rather than exporting a Hevy workout CSV.');
+  output=JSON.stringify(json,null,2);
+  summary.textContent=report.found+' exercise records inspected · '+report.changed.length+' repaired · '+report.remaining.length+' still unmapped.';
+  details.textContent=[...report.changed.map(x=>x.title+' → '+x.primary.join(', ')+' (estimated)'),...report.remaining.map(x=>x+' → still requires manual review')].join('\n')||'There are no unmapped entries to change.';
+  button.disabled=report.changed.length===0;
+ }catch(e){summary.textContent='Unable to read mappings: '+String(e.message||e);}
+ file.value='';
+};
+button.onclick=()=>{
+ if(!output)return;
+ const url=URL.createObjectURL(new Blob([output],{type:'application/json'}));
+ const a=document.createElement('a');a.href=url;a.download='hevy-signal-exercise-mappings-repaired.json';a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1500);
+};
+})();
+</script>
+</body></html>
