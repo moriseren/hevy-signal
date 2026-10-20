@@ -23,7 +23,7 @@
   <main>
     <section class="hero card">
       <h2>Your Hevy history, analyzed on your iPhone.</h2>
-      <p>Import a Hevy workout CSV. Your CSV stays on your device. The app contacts public exercise databases to classify the muscles trained.</p>
+      <p>Import a Hevy workout CSV. Your CSV stays on your device. The app contacts public exercise databases to classify muscles, and supports offline Hevy exercise-name rules.</p>
       <label class="upload" for="csvFile">Import Hevy CSV</label>
       <input id="csvFile" type="file" accept=".csv,text/csv" hidden />
       <div id="status" class="status">No data imported yet.</div>
@@ -42,10 +42,11 @@
     <section id="exercises" class="panel"></section>
     <section id="brief" class="panel"></section>
     <section id="privacy" class="panel"></section>
+  <p style="text-align:center;margin-top:22px"><a href="desktop-mapping-fixer.html" style="color:#a9d6ff">Fix existing Mac desktop app unmapped exercises</a></p>
   </main>
 
   <template id="emptyTemplate"><div class="card empty"><h3>Import a Hevy CSV first</h3><p>Use the button above. Nothing is uploaded to a Hevy Signal server.</p></div></template>
-  <script src="muscle-engine.js"></script>
+  <script src="muscle-engine.js?v=4"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@
   const EDB='https://oss.exercisedb.dev/api/v1/exercises';
   const OVERRIDE_KEY='hevy-signal-muscle-profiles-v2';
   const OLD_KEY='hevy-signal-muscle-overrides-v2';
-  const CACHE_KEY='hevy-signal-wger-v2';
+  const CACHE_KEY='hevy-signal-wger-v3';
   let wger=[],edb=[],status='Local classification only',onlineError='';
   const mayStore=typeof localStorage!=='undefined';
   const read=(key,fallback)=>{if(!mayStore)return fallback;try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
@@ -78,30 +78,54 @@
     source,confidence,matched,note
   });
   // Transparent offline fallback: biomechanical approximations, not database-verified.
+  // Offline movement-family coverage for common Hevy names and custom variants.
+  // These are anatomical heuristics, not database-verified classifications.
+  // Order is important: narrow variations precede general compound patterns.
   const localRules=[
-    [/abduct|clamshell|lateral band walk|monster walk/i,[['Glute med/min'],['Glute max'],[]]],
-    [/hip thrust|glute bridge|glute drive|frog pump/i,[['Glute max'],['Hamstrings'],[]]],
-    [/glute kickback|cable kickback|donkey kick|hip extension/i,[['Glute max'],['Hamstrings'],[]]],
-    [/leg extension|reverse nordic/i,[['Quads — vasti','Quads — rectus femoris'],[],[]]],
-    [/leg curl|nordic curl/i,[['Hamstrings'],[],[]]],
-    [/romanian deadlift|\brdl\b|stiff.leg|good morning/i,[['Hamstrings','Glute max'],[],['Spinal erectors']]],
+    [/^archer pull$/i,[['Rear delts'],['Mid traps/rhomboids','External rotators'],[]]],
+    [/^serratus press\b/i,[['Serratus anterior'],['Chest'],[]]],
+    [/^scapular (pull.?down|depression)|^straight.arm scapular (pull|depress)/i,[['Lower traps','Lats'],['Pectoralis minor'],[]]],
+    [/^suitcase front carry/i,[['Obliques','Abs'],['Forearms','Front delts'],[]]],
+    [/^suitcase (carry|walk|hold)/i,[['Obliques','Abs'],['Forearms','Quadratus lumborum'],[]]],
+    [/^(walk|walking|treadmill walk|brisk walk)(ing)?$/i,[['Cardio / walking'],[],[]]],
+
+    [/hip adduct|adduction|adductor machine|copenhagen plank|copenhagen adduct/i,[['Adductors'],[],[]]],
+    [/hip abduct|abduction|abductor machine|clamshell|clam shell|lateral band walk|monster walk|side lying hip raise|side lying leg raise/i,[['Glute med/min'],['Glute max'],[]]],
+    [/hip thrust|glute bridge|glute drive|frog pump|kas bridge/i,[['Glute max'],['Hamstrings'],[]]],
+    [/glute kickback|cable kickback|donkey kick|quadruped hip extension|hip extension|hip ext\b/i,[['Glute max'],['Hamstrings'],[]]],
+    [/cable pull through|pull through|reverse hyperextension|reverse hyper/i,[['Glute max'],['Hamstrings'],['Spinal erectors']]],
+    [/45.degree (back |hip )?extension|back extension|hyperextension|hip hyperextension/i,[['Spinal erectors','Glute max'],['Hamstrings'],[]]],
+    [/leg extension|reverse nordic|sissy squat|spanish squat/i,[['Quads — vasti','Quads — rectus femoris'],[],[]]],
+    [/leg curl|hamstring curl|nordic curl|glute ham raise|\bghr\b|razor curl/i,[['Hamstrings'],[],[]]],
+    [/romanian deadlift|\brdls?\b|stiff.leg|straight.leg deadlift|good morning/i,[['Hamstrings','Glute max'],[],['Spinal erectors']]],
     [/sumo deadlift/i,[['Glute max','Adductors','Quads'],['Hamstrings'],['Spinal erectors']]],
-    [/deadlift/i,[['Glute max','Spinal erectors'],['Hamstrings','Quads'],[]]],
-    [/hip adduct|adductor machine|copenhagen/i,[['Adductors'],[],[]]],
-    [/bulgarian|split squat|lunge|step.?up/i,[['Quads','Glute max'],['Adductors'],[]]],
-    [/hack squat|pendulum squat|leg press|squat/i,[['Quads','Glute max'],['Adductors'],[]]],
-    [/calf raise|plantar flex/i,[['Calves'],[],[]]],
-    [/face pull|reverse fly|reverse pec|rear delt/i,[['Rear delts','Mid traps/rhomboids'],['External rotators'],[]]],
-    [/lateral raise|side raise|cable y.?raise/i,[['Side delts'],['Upper traps'],[]]],
-    [/overhead press|shoulder press|military press/i,[['Front delts'],['Triceps','Side delts'],[]]],
-    [/chest.supported row|high row|wide.grip row|upper.back row/i,[['Mid traps/rhomboids','Rear delts'],['Lats','Biceps'],[]]],
-    [/row/i,[['Lats','Mid traps/rhomboids'],['Rear delts','Biceps'],[]]],
-    [/lat pulldown|pull.up|chin.up|pullover/i,[['Lats'],['Biceps'],[]]],
-    [/incline (bench|press|chest)/i,[['Upper chest'],['Front delts','Triceps'],[]]],
-    [/bench|chest press|push.up|pec deck|chest fly|cable fly/i,[['Chest'],['Front delts','Triceps'],[]]],
-    [/tricep|skull.crusher|pushdown|overhead extension/i,[['Triceps'],[],[]]],
-    [/bicep|hammer curl|preacher curl|incline curl|concentration curl|(?<!leg )\bcurl\b/i,[['Biceps'],['Brachialis/brachioradialis'],[]]],
-    [/crunch|sit.up|leg raise|ab wheel|plank/i,[['Abs'],['Hip flexors'],[]]]
+    [/deadlift|rack pull|block pull|trap bar lift/i,[['Glute max','Spinal erectors'],['Hamstrings','Quads'],[]]],
+    [/leg press|hack squat|pendulum squat|belt squat|goblet squat|front squat|back squat|smith squat|squat|wall sit/i,[['Quads','Glute max'],['Adductors'],[]]],
+    [/bulgarian|split squat|lunge|step.?up|step.?down/i,[['Quads','Glute max'],['Adductors'],[]]],
+    [/calf press|calf raise|soleus raise|seated calf|standing calf|donkey calf|toe press/i,[['Calves'],[],[]]],
+    [/tibialis|toe raise|dorsiflexion/i,[['Tibialis anterior'],[],[]]],
+    [/face pull|reverse fly|reverse pec|rear delt|reverse butterfly/i,[['Rear delts','Mid traps/rhomboids'],['External rotators'],[]]],
+    [/lateral raise|side raise|cable y.?raise|lean.?away raise|scaption/i,[['Side delts'],['Upper traps'],[]]],
+    [/front raise|front plate raise/i,[['Front delts'],[],[]]],
+    [/external rotation|rotator cuff|cuban press/i,[['External rotators'],['Rear delts'],[]]],
+    [/shrug|farmer.?s? (walk|carry|hold)/i,[['Upper traps'],['Forearms'],[]]],
+    [/upright row|high pull/i,[['Side delts','Upper traps'],['Biceps'],[]]],
+    [/arnold press|overhead press|shoulder press|military press|landmine press|push press/i,[['Front delts'],['Triceps','Side delts'],[]]],
+    [/chest.supported row|high row|wide.grip row|upper.back row|rear delt row|face.away row/i,[['Mid traps/rhomboids','Rear delts'],['Lats','Biceps'],[]]],
+    [/t.?bar row|inverted row|horizontal row|seal row|bent.?over row|seated row|one.arm row|single.arm row|machine row|cable row|dumbbell row|barbell row|\brow\b/i,[['Lats','Mid traps/rhomboids'],['Rear delts','Biceps'],[]]],
+    [/lat pulldown|pull.?down|pull.?up|chin.?up|pull.?over|straight.arm pulldown|lat prayer|scapular pull/i,[['Lats'],['Biceps'],[]]],
+    [/close.grip bench|close.grip press|jm press|tricep dip|triceps dip|bench dip/i,[['Triceps'],['Chest','Front delts'],[]]],
+    [/chest dip|weighted dip|parallel bar dip|\bdips?\b/i,[['Chest','Triceps'],['Front delts'],[]]],
+    [/incline (dumbbell |barbell |smith |machine )?(bench|press|chest)|incline bench|incline dumbbell (bench|press|fly)/i,[['Upper chest'],['Front delts','Triceps'],[]]],
+    [/bench|chest press|push.?up|pec.?deck|chest fly|cable fly|dumbbell fly|butterfly|cable cross.?over|chest crossover/i,[['Chest'],['Front delts','Triceps'],[]]],
+    [/tricep|triceps|skull.?crusher|push.?down|overhead extension|rope extension|french press|kickback \((dumbbell|cable)\)/i,[['Triceps'],[],[]]],
+    [/wrist extension|wrist curl|reverse curl|forearm curl|grip trainer|wrist roller/i,[['Forearms'],['Biceps'],[]]],
+    [/hammer curl|preacher curl|incline curl|concentration curl|spider curl|zottman curl|bayesian curl|bicep curl|biceps curl|cable curl|dumbbell curl|barbell curl|ez.bar curl|\bcurl\b/i,[['Biceps'],['Brachialis/brachioradialis'],[]]],
+    [/pallof|anti.?rotation|woodchop|wood chop|russian twist|side plank|oblique crunch/i,[['Obliques'],['Abs'],[]]],
+    [/crunch|sit.?up|leg raise|knee raise|hanging knee|ab wheel|plank|dead bug|hollow hold|hollow body|mountain climber|v.?up|toes.to.bar|abdominal/i,[['Abs'],['Hip flexors'],[]]],
+    [/back raise|superman|bird dog/i,[['Spinal erectors'],['Glute max'],[]]],
+    [/hip flexion|psoas march|hip flexor raise/i,[['Hip flexors'],[],[]]],
+    [/neck flexion|neck extension|neck harness/i,[['Neck'],[],[]]]
   ];
   // ExRx's pages are linked only when manually confirmed. No scraping or redistribution.
   const validated=[
@@ -151,6 +175,7 @@
   }
   function count(rows,{secondaryCredit=0}={}){
     const output={};for(const row of rows){const p=profile(row.exercise);
+      if(p.primary.length===1 && p.primary[0]==='Cardio / walking')continue;
       for(const name of p.primary){const x=output[name]||(output[name]={primary:0,secondary:0,stabilizer:0,effective:0});x.primary+=1;}
       for(const name of p.secondary){const x=output[name]||(output[name]={primary:0,secondary:0,stabilizer:0,effective:0});x.secondary+=1;}
       for(const name of p.stabilizers){const x=output[name]||(output[name]={primary:0,secondary:0,stabilizer:0,effective:0});x.stabilizer+=1;}
@@ -179,24 +204,47 @@
       wger=record.rows;status='wger cached catalog';}
     else{
       try{
-        const items=[];let url=WGER+'?language=2&limit=100&offset=0';let page=0;
-        while(url&&page<25){const data=await timeoutFetch(url);if(!data||!Array.isArray(data.results))throw Error('Unexpected wger API response');items.push(...data.results.map(convertWger).filter(Boolean));page++;
-          url=data.next&&page<25?new URL(data.next,WGER).href:null;
+        const items=[];let url=WGER+'?language=2&limit=100&offset=0';let page=0,truncated=false;
+        while(url&&page<30){const data=await timeoutFetch(url);if(!data||!Array.isArray(data.results))throw Error('Unexpected wger API response');items.push(...data.results.map(convertWger).filter(Boolean));page++;
+          if(data.next && page>=30){truncated=true;url=null;}
+          else url=data.next?new URL(data.next,WGER).href:null;
           if(url&&!url.startsWith('https://wger.de/'))throw Error('Unexpected pagination host');
         }
         if(!items.length)throw Error('No English exercises returned');
         wger=items;write(CACHE_KEY,{when:Date.now(),rows:items});
-        status='wger exercise catalog loaded';onlineError='';
+        status=truncated?'wger catalog partially loaded (page limit)':'wger exercise catalog loaded';onlineError='';
       }catch(e){onlineError=String(e.message||e);status=wger.length?'wger cached catalog (offline)':'Offline local rules (wger unavailable)';}
     }
     if(useExerciseDB){
+      const seen=new Set(),items=[];
       try{
-        // Only hold in memory; ExerciseDB terms do not allow permanent local storage.
-        const data=await timeoutFetch(EDB,15000);
-        const rows=Array.isArray(data)?data:Array.isArray(data.data)?data.data:Array.isArray(data.results)?data.results:Array.isArray(data.exercises)?data.exercises:[];
-        edb=rows.map(convertEDB).filter(Boolean);
-        if(edb.length)status+=' + ExerciseDB supplemental matches';
-      }catch(e){onlineError+=(onlineError?'; ':'')+'ExerciseDB: '+String(e.message||e);}
+        const pageSize=100,maxPages=18;
+        for(let page=0,offset=0;page<maxPages;page++){
+          // Fetch public catalog pages; do not send personal workout/exercise names.
+          const endpoint=EDB+'?limit='+pageSize+'&offset='+offset;
+          const data=await timeoutFetch(endpoint,15000);
+          const rows=Array.isArray(data)?data:Array.isArray(data.data)?data.data:
+            Array.isArray(data.results)?data.results:Array.isArray(data.exercises)?data.exercises:[];
+          if(!rows.length)break;
+          let added=0;
+          for(const item of rows.map(convertEDB).filter(Boolean)){
+            const id=String(item.id||item.name);
+            if(!seen.has(id)){seen.add(id);items.push(item);added++;}
+          }
+          if(!added)break;
+          offset+=rows.length;
+          const total=Number(data.total??data.count??data.pagination?.total??NaN);
+          if(Number.isFinite(total)&&offset>=total)break;
+          // If the server explicitly says there is no next page, stop.
+          if(data.next===null || data.pagination?.hasNext===false)break;
+          // No reliable end-of-catalog metadata: continue until the final empty page.
+        }
+        edb=items;
+        if(edb.length)status+=' + ExerciseDB '+edb.length+' supplemental records';
+      }catch(e){
+        if(items.length){edb=items;status+=' + ExerciseDB partial catalog ('+items.length+' records)';}
+        onlineError+=(onlineError?'; ':'')+'ExerciseDB: '+String(e.message||e);
+      }
     }
     return {status,wgerCount:wger.length,exerciseDBCount:edb.length,error:onlineError};
   }

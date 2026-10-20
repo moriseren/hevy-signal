@@ -4,7 +4,7 @@ const dbName='hevy-signal-mobile-v1';
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(dbName,1);r.onupgradeneeded=()=>r.result.createObjectStore('state');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
 async function saveData(){const db=await openDB();await new Promise((res,rej)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put({rows:state.rows,source:state.source},'data');tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});db.close();}
 async function loadData(){try{const db=await openDB();const data=await new Promise((res,rej)=>{const tx=db.transaction('state');const r=tx.objectStore('state').get('data');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});db.close();if(data?.rows){state.rows=data.rows;state.source=data.source||'csv';rebuild();}}catch(e){console.warn(e)}}
-async function clearData(){indexedDB.deleteDatabase(dbName);for(const k of ['hevy-signal-muscle-profiles-v2','hevy-signal-muscle-overrides-v2','hevy-signal-wger-v2',CREDIT_KEY,EDB_KEY])localStorage.removeItem(k);state.rows=[];state.workouts=[];state.source='none';renderAll();$('#status').textContent='Local mobile data cleared.';}
+async function clearData(){indexedDB.deleteDatabase(dbName);for(const k of ['hevy-signal-muscle-profiles-v2','hevy-signal-muscle-overrides-v2','hevy-signal-wger-v2','hevy-signal-wger-v3',CREDIT_KEY,EDB_KEY])localStorage.removeItem(k);state.rows=[];state.workouts=[];state.source='none';renderAll();$('#status').textContent='Local mobile data cleared.';}
 function parseCSV(text){const out=[];let row=[],field='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(q){if(c==='"'&&n==='"'){field+='"';i++;}else if(c==='"'){q=false;}else field+=c;}else{if(c==='"')q=true;else if(c===','){row.push(field);field='';}else if(c==='\n'){row.push(field.replace(/\r$/,''));out.push(row);row=[];field='';}else field+=c;}}if(field.length||row.length){row.push(field.replace(/\r$/,''));out.push(row);}if(q)throw new Error('CSV has an unclosed quote.');return out;}
 const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
 function col(headers,...names){const map=new Map(headers.map((h,i)=>[norm(h),i]));for(const n of names){const i=map.get(norm(n));if(i!==undefined)return i;}return -1;}
@@ -63,6 +63,7 @@ function renderOverview(){
  const ex=uniq(state.rows.map(x=>x.exercise));
  const groups=PROFILE.count(state.rows,{secondaryCredit});
  const coverage=catalogSummary(),diag=PROFILE.diagnostics();
+ const missing=ex.filter(name=>profile(name).confidence==='unmapped');
  const max=Math.max(1,...Object.values(groups).map(x=>x.effective));
  $('#overview').innerHTML=`
  <div class="grid"><div class="stat"><span>Workouts</span><b>${state.workouts.length}</b></div>
@@ -70,11 +71,15 @@ function renderOverview(){
  <div class="stat"><span>Exercises</span><b>${ex.length}</b></div>
  <div class="stat"><span>Needs review</span><b>${coverage.review+coverage.estimated+coverage.unmapped}</b></div></div>
  <div class="card" style="margin-top:12px"><h3>Anatomy reference matching</h3>
- <div class="status" id="catalogStatus">${esc(diag.status)} · ${diag.wgerCount} wger records · ${diag.exerciseDBCount} ExerciseDB records</div>
+ <div class="status" id="catalogStatus">${esc(diag.status)} · ${diag.wgerCount} wger records · ${diag.exerciseDBCount} ExerciseDB records${diag.error?`<div class="pill warn" style="white-space:normal;margin-top:8px">Database lookup problem: ${esc(diag.error)}</div>`:""}</div>
  <div class="actions" style="margin-top:10px"><button id="refreshCatalog" class="ghost">Refresh online databases</button>
  <label class="small"><input type="checkbox" id="useExerciseDB" ${useExerciseDB?'checked':''}/> Supplement from ExerciseDB (non-commercial terms)</label></div>
  <p class="muted small">Database matches: ${coverage.high+coverage.medium+coverage.curated} / ${coverage.total} exercises; ${coverage.manual} user corrections. Other results are estimates or unmapped. Confidence refers to name matching, NOT research certainty.</p></div>
- <h3 class="section-title">Muscle volume from imported sets</h3>
+ <div class="card" style="margin-top:12px">
+ <h3>Exercises not yet classified: ${missing.length}</h3>
+ <p class="muted small">Unrecognized exercise names are never silently assigned to an unrelated muscle. For custom Hevy movements, edit their mapping in the Exercises tab, or copy the titles to request a new matching rule.</p>
+ ${missing.length?`<div class="actions"><button id="copyUnmapped" class="ghost">Copy unmapped names</button></div><div class="sub">${missing.map(esc).join(' · ')}</div>`:'<p class="muted small">All exercise names are classified. Check estimates in the Exercises tab.</p>'}
+ </div><h3 class="section-title">Muscle volume from imported sets</h3>
  <div class="card"><label class="small" for="secondaryCredit">Optional credit for secondary involvement</label>
  <select id="secondaryCredit"><option value="0" ${secondaryCredit===0?'selected':''}>0% · Direct sets only (recommended)</option>
  <option value="0.25" ${secondaryCredit===.25?'selected':''}>25% · User modeling assumption</option>
@@ -85,6 +90,7 @@ function renderOverview(){
  $('#secondaryCredit').onchange=e=>{secondaryCredit=Number(e.target.value);localStorage.setItem(CREDIT_KEY,String(secondaryCredit));renderOverview();renderBrief();};
  $('#useExerciseDB').onchange=e=>{useExerciseDB=e.target.checked;localStorage.setItem(EDB_KEY,useExerciseDB?'yes':'no');refreshCatalog(true);};
  $('#refreshCatalog').onclick=()=>refreshCatalog(true);
+ const missingButton=$('#copyUnmapped');if(missingButton)missingButton.onclick=async()=>{const body=missing.join('\n');try{await navigator.clipboard.writeText(body);missingButton.textContent='Copied exercise names'}catch(e){prompt('Copy these exercise names:',body)}};
 }
 function renderProgram(){if(!state.rows.length)return empty('#program');const t=recentTemplates();$('#program').innerHTML=`<div class="card"><h3>Inferred current program</h3><p class="muted small">CSV exports contain completed workouts, not your saved Hevy routines. These cards are inferred from the latest occurrence of recent workout names.</p></div><div class="list" style="margin-top:10px">${t.map(x=>`<div class="row"><div><div class="title">${esc(x.title)}</div><div class="sub">Latest: ${fmtDate(x.date)} · ${x.exercises.length} exercises</div><div class="sub">${x.exercises.map(esc).join(' · ')}</div></div><span class="pill warn">inferred</span></div>`).join('')}</div>`;}
 function renderExercises(){

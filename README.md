@@ -42,6 +42,12 @@ Direct sets and secondary exposures are tracked separately. Secondary set credit
 
 **Desktop limitation:** this update changes the GitHub mobile browser edition, not the precompiled desktop Mac or Windows release. The desktop Go/frontend source must be rebuilt separately to incorporate this reference engine.
 
+### Repair mappings in the existing Mac app
+
+The Mac v3.2 binary cannot be updated simply by merging web files into GitHub. For users of the existing Mac app, use the [local mapping repair page](docs/desktop-mapping-fixer.html): export your existing mappings from **Privacy & Data**, load the JSON into the repair page, download the corrected JSON and import it through **Privacy & Data → Import exercise mappings**. This only fills missing or "Unmapped" muscle entries and preserves any existing manual classifications, matching exercise IDs and other fields. The repair occurs entirely within the browser; the JSON is not uploaded to a server. The page uses curated local heuristics rather than representing every assignment as independently validated. Keep your original export as a backup.
+
+The improved mobile/browser classifier now covers common Hevy movements including named examples from the training brief such as Archer Pull, Serratus Press, Scapular Pulldown and Suitcase Front Carry. Additional unknowns are explicitly listed with a Copy unmapped names button so their labels can be reviewed.
+
 ## Hevy Pro is optional in v3.2
 
 Hevy Signal now supports two data-source modes.
