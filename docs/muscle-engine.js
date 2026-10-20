@@ -81,7 +81,7 @@
   const localRules=[
     [/abduct|clamshell|lateral band walk|monster walk/i,[['Glute med/min'],['Glute max'],[]]],
     [/hip thrust|glute bridge|glute drive|frog pump/i,[['Glute max'],['Hamstrings'],[]]],
-    [/kickback|donkey kick|hip extension/i,[['Glute max'],['Hamstrings'],[]]],
+    [/glute kickback|cable kickback|donkey kick|hip extension/i,[['Glute max'],['Hamstrings'],[]]],
     [/leg extension|reverse nordic/i,[['Quads — vasti','Quads — rectus femoris'],[],[]]],
     [/leg curl|nordic curl/i,[['Hamstrings'],[],[]]],
     [/romanian deadlift|\brdl\b|stiff.leg|good morning/i,[['Hamstrings','Glute max'],[],['Spinal erectors']]],
@@ -100,12 +100,12 @@
     [/incline (bench|press|chest)/i,[['Upper chest'],['Front delts','Triceps'],[]]],
     [/bench|chest press|push.up|pec deck|chest fly|cable fly/i,[['Chest'],['Front delts','Triceps'],[]]],
     [/tricep|skull.crusher|pushdown|overhead extension/i,[['Triceps'],[],[]]],
-    [/bicep|hammer curl|preacher curl|incline curl|concentration curl/i,[['Biceps'],['Brachialis/brachioradialis'],[]]],
+    [/bicep|hammer curl|preacher curl|incline curl|concentration curl|(?<!leg )\bcurl\b/i,[['Biceps'],['Brachialis/brachioradialis'],[]]],
     [/crunch|sit.up|leg raise|ab wheel|plank/i,[['Abs'],['Hip flexors'],[]]]
   ];
   // ExRx's pages are linked only when manually confirmed. No scraping or redistribution.
   const validated=[
-    {rule:/^barbell deadlift$/i,primary:['Spinal erectors'],secondary:['Glute max','Adductor magnus','Quads','Hamstrings','Soleus'],stabilizers:['Mid traps/rhomboids','Upper traps','Abs'],url:'https://exrx.net/WeightExercises/ErectorSpinae/BBDeadlift'},
+    {rule:/^barbell deadlift$/i,primary:['Spinal erectors'],secondary:['Glute max','Adductor magnus','Quads','Hamstrings','Soleus'],stabilizers:['Mid traps/rhomboids','Upper traps','Levator scapulae','Abs'],url:'https://exrx.net/WeightExercises/ErectorSpinae/BBDeadlift'},
     {rule:/^(sit.up|sit up)$/i,primary:['Abs'],secondary:['Iliopsoas','Tensor fasciae latae','Quads — rectus femoris','Sartorius','Obliques'],stabilizers:['Tibialis anterior'],url:'https://exrx.net/WeightExercises/RectusAbdominis/BWSitUp'}
   ];
   function fallback(ex){
@@ -139,9 +139,12 @@
     if(options.length){
       const best=options[0],runner=options[1];
       // Avoid guessing if two similarly named but anatomically different records compete.
-      if(!runner||best.top-runner.top>=.06 || JSON.stringify(best.item.primary)===JSON.stringify(runner.item.primary)){
+      const conflict=!!runner&&best.top-runner.top<.06&&JSON.stringify(best.item.primary)!==JSON.stringify(runner.item.primary);
+      // Exact database matches win; close non-exact, conflicting options require review.
+      if(best.top>=.97||!conflict){
         const source=best.provider===0?{name:'wger',url:'https://wger.de/api/v2/exerciseinfo/'+best.item.id+'/'}:{name:'ExerciseDB (free API)',url:'https://oss.exercisedb.dev/docs'};
-        return pack(best.item.primary,best.item.secondary,[],source,best.top>=.97?'high':best.top>=.88?'medium':'review',best.matched,'Database exercise-name match; stabilizers were not supplied.');
+        const note=conflict?'Other similarly named reference records classify different primary muscles; review this mapping.':'Database exercise-name match; stabilizers were not supplied.';
+        return pack(best.item.primary,best.item.secondary,[],source,conflict?'review':best.top>=.97?'high':best.top>=.88?'medium':'review',best.matched,note);
       }
     }
     const f=fallback(ex);if(options.length)f.note+=' Multiple close database matches; manual review recommended.';return f;
