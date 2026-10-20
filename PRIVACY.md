@@ -45,3 +45,8 @@ Current public-beta builds are unsigned and distributed with manual updates. Do 
 ## Independence
 
 Hevy Signal is an independent project and is not affiliated with or endorsed by Hevy.
+
+
+## Online muscle classification (mobile browser)
+
+The app requests public general exercise catalogs from wger.de and optionally oss.exercisedb.dev, so the provider sees the device's IP request. No imported Hevy CSV, personal workout history or exercise title list is uploaded in these requests. wger data can be cached in the browser for seven days with provenance information. Optional ExerciseDB data are memory-only, not persisted. Toggle ExerciseDB on or off from the Overview screen.

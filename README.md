@@ -30,6 +30,18 @@ A pure browser version lives in [`docs/`](docs/) and is designed for iPhone Safa
 
 The included GitHub Pages workflow publishes the `docs/` folder after Pages is enabled for this repository.
 
+## Automatic muscle-reference matching (mobile browser)
+
+The mobile browser app looks up exercise names against the public [wger](https://wger.de) API and optionally supplements matches from [AscendAPI/ExerciseDB Free](https://oss.exercisedb.dev/docs). Each imported movement identifies primary movers, secondary movers, source, exercise-name match confidence, and stabilizers when documented. It prefers clear database matches; ambiguous names fall back to labeled local rules or stay unmapped.
+
+You can manually edit primary, secondary and stabilizer muscles per exercise; the override stays in your browser and wins over automatic matching. If offline, local biomechanics rules continue working. Confidence measures whether exercise names match, not scientific evidence quality or intensity of a particular lifter's muscle recruitment.
+
+Direct sets and secondary exposures are tracked separately. Secondary set credit settings of 0% (default), 25%, and 50% are optional user-selected modeling assumptions, not evidence-validated hypertrophy fractions. Stabilizer mentions never receive modeled volume credit.
+
+**Attribution / license:** wger exercise records carry individual Creative Commons licenses: [wger](https://wger.de), [source project](https://github.com/wger-project/wger). ExerciseDB free API is available for non-commercial use only with AscendAPI attribution; results are kept in memory, not persistently cached. [ExRx](https://exrx.net) is linked for two individually reviewed movement examples; the site's contents are not bulk-imported. Some exercises may remain unmatched, and APIs can be unavailable due to network/CORS restrictions.
+
+**Desktop limitation:** this update changes the GitHub mobile browser edition, not the precompiled desktop Mac or Windows release. The desktop Go/frontend source must be rebuilt separately to incorporate this reference engine.
+
 ## Hevy Pro is optional in v3.2
 
 Hevy Signal now supports two data-source modes.
