@@ -4,7 +4,7 @@ const dbName='hevy-signal-mobile-v1';
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(dbName,1);r.onupgradeneeded=()=>r.result.createObjectStore('state');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
 async function saveData(){const db=await openDB();await new Promise((res,rej)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put({rows:state.rows,source:state.source},'data');tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});db.close();}
 async function loadData(){try{const db=await openDB();const data=await new Promise((res,rej)=>{const tx=db.transaction('state');const r=tx.objectStore('state').get('data');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});db.close();if(data?.rows){state.rows=data.rows;state.source=data.source||'csv';rebuild();}}catch(e){console.warn(e)}}
-async function clearData(){indexedDB.deleteDatabase(dbName);state.rows=[];state.workouts=[];state.source='none';renderAll();$('#status').textContent='Local mobile data cleared.';}
+async function clearData(){indexedDB.deleteDatabase(dbName);for(const k of ['hevy-signal-muscle-profiles-v2','hevy-signal-muscle-overrides-v2','hevy-signal-wger-v2',CREDIT_KEY,EDB_KEY])localStorage.removeItem(k);state.rows=[];state.workouts=[];state.source='none';renderAll();$('#status').textContent='Local mobile data cleared.';}
 function parseCSV(text){const out=[];let row=[],field='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(q){if(c==='"'&&n==='"'){field+='"';i++;}else if(c==='"'){q=false;}else field+=c;}else{if(c==='"')q=true;else if(c===','){row.push(field);field='';}else if(c==='\n'){row.push(field.replace(/\r$/,''));out.push(row);row=[];field='';}else field+=c;}}if(field.length||row.length){row.push(field.replace(/\r$/,''));out.push(row);}if(q)throw new Error('CSV has an unclosed quote.');return out;}
 const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
 function col(headers,...names){const map=new Map(headers.map((h,i)=>[norm(h),i]));for(const n of names){const i=map.get(norm(n));if(i!==undefined)return i;}return -1;}
@@ -14,50 +14,50 @@ function isWarmup(v){return /warm/i.test(String(v||''));}
 function importHevy(text){const rows=parseCSV(text);if(rows.length<2)throw new Error('CSV has no workout rows.');const h=rows[0];const ix={title:col(h,'title','workout title','workout_title'),start:col(h,'start_time','start time','date','workout date'),exercise:col(h,'exercise_title','exercise title','exercise_name','exercise name'),setType:col(h,'set_type','set type'),weightKg:col(h,'weight_kg','weight kg'),weightLb:col(h,'weight_lbs','weight lbs','weight lb'),reps:col(h,'reps'),rpe:col(h,'rpe')};if(ix.exercise<0||ix.start<0)throw new Error('This does not look like a Hevy workout export (missing exercise/date columns).');const parsed=[];for(let r=1;r<rows.length;r++){const x=rows[r];if(!x.length||!x[ix.exercise])continue;if(ix.setType>=0&&isWarmup(x[ix.setType]))continue;const d=dateVal(x[ix.start]);if(!d)continue;let kg=ix.weightKg>=0?num(x[ix.weightKg]):null;if(kg==null&&ix.weightLb>=0){const lb=num(x[ix.weightLb]);if(lb!=null)kg=lb*0.45359237;}parsed.push({title:(ix.title>=0?x[ix.title]:'Workout')||'Workout',date:d.toISOString(),exercise:x[ix.exercise].trim(),kg,reps:ix.reps>=0?num(x[ix.reps]):null,rpe:ix.rpe>=0?num(x[ix.rpe]):null});}if(!parsed.length)throw new Error('No working sets could be read from this CSV.');return parsed;}
 // Fractional hypertrophy set credit is an estimate, not an EMG measurement.
 // Specific movement variants take priority over general movement families.
-const MUSCLE_RULES=[
-[/\b(cable|standing|machine|seated)?\s*(hip )?abduct(ion|or)|lateral band walk|monster walk|clamshell/i,[['Glute med/min',1],['Glute max',.15]]],
-[/hip thrust|glute bridge|frog pump|glute drive/i,[['Glute max',1],['Hamstrings',.1],['Adductors',.1]]],
-[/kickback|donkey kick|hip extension/i,[['Glute max',1],['Hamstrings',.15]]],
-[/leg extension|reverse nordic/i,[['Quads — rectus femoris',1],['Quads — vasti',1]]],
-[/seated leg curl|lying leg curl|prone leg curl|standing leg curl|nordic curl|hamstring curl/i,[['Hamstrings',1]]],
-[/romanian deadlift|\brdl\b|stiff.?leg|good morning|pull.through/i,[['Hamstrings',1],['Glute max',.7],['Spinal erectors',.4]]],
-[/sumo deadlift/i,[['Glute max',.8],['Quads — vasti',.6],['Adductors',.7],['Spinal erectors',.4]]],
-[/deadlift/i,[['Glute max',.8],['Hamstrings',.5],['Quads — vasti',.5],['Spinal erectors',.5]]],
-[/hip adduct|adductor machine|copenhagen/i,[['Adductors',1]]],
-[/bulgarian|split squat|lunge|step.?up/i,[['Quads — vasti',1],['Glute max',.7],['Adductors',.2]]],
-[/hack squat|pendulum squat|leg press|squat/i,[['Quads — vasti',1],['Glute max',.6],['Adductors',.3]]],
-[/calf raise|plantar flex/i,[['Calves',1]]],
-[/face pull|reverse fly|reverse pec|rear delt/i,[['Rear delts',1],['Mid traps/rhomboids',.6],['External rotators',.3]]],
-[/lateral raise|side raise|cable y.?raise/i,[['Side delts',1],['Upper traps',.15]]],
-[/overhead press|shoulder press|military press/i,[['Front delts',1],['Triceps',.6],['Side delts',.4]]],
-[/chest.supported row|high row|wide.grip row|upper.back row/i,[['Mid traps/rhomboids',1],['Rear delts',.7],['Lats',.4],['Biceps',.35]]],
-[/row/i,[['Lats',.75],['Mid traps/rhomboids',.75],['Rear delts',.35],['Biceps',.35]]],
-[/lat pulldown|pull.up|chin.up|pullover|straight.arm pulldown/i,[['Lats',1],['Biceps',.35],['Mid traps/rhomboids',.2]]],
-[/incline (bench|press|chest)/i,[['Upper chest',1],['Front delts',.5],['Triceps',.4]]],
-[/bench|chest press|push.up|pec deck|chest fly|cable fly/i,[['Chest',1],['Front delts',.4],['Triceps',.3]]],
-[/tricep|triceps|skull.?crusher|pushdown|overhead extension/i,[['Triceps',1]]],
-[/bicep|hammer curl|preacher curl|incline curl|concentration curl/i,[['Biceps',1],['Brachialis/brachioradialis',.4]]],
-[/crunch|leg raise|ab wheel|plank|abdom/i,[['Abs',1]]]
-];
-const MUSCLE_OVERRIDES_KEY='hevy-signal-muscle-overrides-v2';
-function getOverrides(){try{return JSON.parse(localStorage.getItem(MUSCLE_OVERRIDES_KEY)||'{}')}catch{return {}}}
-function contributions(ex){const custom=getOverrides()[ex];if(custom)return custom;for(const [pattern,parts] of MUSCLE_RULES)if(pattern.test(ex))return parts;return [['Unmapped',1]];}
-function muscle(ex){return contributions(ex).map(([name,weight])=>name+(weight===1?'':(' '+Math.round(weight*100)+'%'))).join(' · ');}
-function editMuscle(ex){const current=contributions(ex).map(([m,w])=>m+':'+w).join(', ');
-const answer=prompt('Muscle set credit for '+ex+'\nUse Muscle:weight pairs (0–1), separated by commas. Example: Glute max:1, Hamstrings:0.3\nClear the field to reset to automatic mapping.',getOverrides()[ex]?current:current);
-if(answer===null)return;
-const overrides=getOverrides();
-if(!answer.trim()){delete overrides[ex];}else{
-const parsed=answer.split(',').map(s=>{const p=s.lastIndexOf(':');if(p<1)throw Error('Use Muscle:weight pairs.');const name=s.slice(0,p).trim(),w=Number(s.slice(p+1).trim());if(!name||!Number.isFinite(w)||w<=0||w>1)throw Error('Each weight must be greater than 0 and at most 1.');return [name,w]});
-overrides[ex]=parsed;
+
+const PROFILE=window.HevyMuscles;
+const CREDIT_KEY='hevy-signal-secondary-credit-v1';
+const EDB_KEY='hevy-signal-use-exercisedb-v1';
+let secondaryCredit=Number(localStorage.getItem(CREDIT_KEY)||0);
+let useExerciseDB=localStorage.getItem(EDB_KEY)!=='no';
+const profile=ex=>PROFILE.profile(ex);
+const muscle=ex=>profile(ex).primary.join(', ')||'Unmapped';
+const listText=a=>a.length?a.join(', '):'Not listed';
+function editMuscle(ex){
+ const old=profile(ex);
+ const info='Enter names separated by commas. Personal corrections override reference databases.';
+ const first=prompt('PRIMARY movers: '+ex+'\n'+info,old.primary.join(', '));
+ if(first===null)return;
+ if(!first.trim()){if(confirm('Reset to automatic classification?')){PROFILE.clearOverride(ex);renderAll();}return;}
+ const second=prompt('SECONDARY movers: '+ex+'\n'+info,old.secondary.join(', '));if(second===null)return;
+ const third=prompt('STABILIZERS (optional): '+ex+'\n'+info,old.stabilizers.join(', '));if(third===null)return;
+ const parse=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
+ PROFILE.setOverride(ex,{primary:parse(first),secondary:parse(second),stabilizers:parse(third)});
+ renderAll();
 }
-localStorage.setItem(MUSCLE_OVERRIDES_KEY,JSON.stringify(overrides));renderAll();}
+function catalogSummary(){
+ const items=uniq(state.rows.map(x=>x.exercise));
+ const counts={high:0,medium:0,review:0,estimated:0,curated:0,manual:0,unmapped:0};
+ for(const ex of items){const key=profile(ex).confidence;counts[key]=(counts[key]||0)+1;}
+ return {total:items.length,...counts};
+}
+async function refreshCatalog(force=false){
+ const el=document.querySelector('#catalogStatus'),button=document.querySelector('#refreshCatalog');
+ if(el)el.textContent='Updating anatomy references…';
+ if(button)button.disabled=true;
+ try{
+  const d=await PROFILE.sync({useExerciseDB,force});
+  if(el)el.textContent=d.status+' · '+d.wgerCount+' wger records'+(d.exerciseDBCount?' · '+d.exerciseDBCount+' ExerciseDB records':'')+(d.error?' · Some sources unavailable':'');
+ }catch(e){if(el)el.textContent='Lookup unavailable: '+String(e.message||e);}
+ if(button)button.disabled=false;
+ renderAll();
+}
 function rebuild(){state.rows.sort((a,b)=>new Date(a.date)-new Date(b.date));const wm=new Map();for(const s of state.rows){const key=s.title+'|'+s.date.slice(0,10);if(!wm.has(key))wm.set(key,{title:s.title,date:s.date,sets:[]});wm.get(key).sets.push(s);}state.workouts=[...wm.values()].sort((a,b)=>new Date(b.date)-new Date(a.date));renderAll();$('#status').textContent=`${state.workouts.length} workouts · ${state.rows.length} working sets stored locally`;}
 function fmtDate(s){return new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',year:'numeric'}).format(new Date(s));}
 function uniq(a){return [...new Set(a)];}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function recentTemplates(){const seen=new Set(),out=[];for(const w of state.workouts){if(seen.has(w.title))continue;seen.add(w.title);const ex=[];for(const s of w.sets)if(!ex.includes(s.exercise))ex.push(s.exercise);out.push({title:w.title,date:w.date,exercises:ex});if(out.length>=4)break;}return out;}
-function exerciseStats(){const map=new Map();for(const s of state.rows){if(!map.has(s.exercise))map.set(s.exercise,[]);map.get(s.exercise).push(s);}return [...map].map(([name,sets])=>{sets.sort((a,b)=>new Date(b.date)-new Date(a.date));const recent=sets.slice(0,8),best=sets.filter(x=>x.kg!=null&&x.reps!=null).sort((a,b)=>(b.kg*b.reps)-(a.kg*a.reps))[0];return{name,sets,recent,best,muscle:muscle(name)};}).sort((a,b)=>b.sets.length-a.sets.length);}
+function exerciseStats(){const map=new Map();for(const s of state.rows){if(!map.has(s.exercise))map.set(s.exercise,[]);map.get(s.exercise).push(s);}return [...map].map(([name,sets])=>{sets.sort((a,b)=>new Date(b.date)-new Date(a.date));const recent=sets.slice(0,8),best=sets.filter(x=>x.kg!=null&&x.reps!=null).sort((a,b)=>(b.kg*b.reps)-(a.kg*a.reps))[0];return{name,sets,recent,best,profile:profile(name)};}).sort((a,b)=>b.sets.length-a.sets.length);}
 function renderOverview(){if(!state.rows.length)return empty('#overview');const ex=uniq(state.rows.map(x=>x.exercise));const dates=state.rows.map(x=>new Date(x.date)).sort((a,b)=>a-b);const groups={};for(const s of state.rows){for(const [m,w] of contributions(s.exercise)){groups[m]=(groups[m]||0)+w;}}const max=Math.max(1,...Object.values(groups));$('#overview').innerHTML=`<div class="grid"><div class="stat"><span>Workouts</span><b>${state.workouts.length}</b></div><div class="stat"><span>Working sets</span><b>${state.rows.length}</b></div><div class="stat"><span>Exercises</span><b>${ex.length}</b></div><div class="stat"><span>History</span><b>${Math.max(1,Math.round((dates.at(-1)-dates[0])/86400000))}d</b></div></div><h3 class="section-title">Estimated effective set credit by muscle</h3><div class="list">${Object.entries(groups).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="row"><div style="flex:1"><div class="title">${esc(m)}</div><div class="progress"><i style="width:${Math.round(n/max*100)}%"></i></div></div><span class="pill">${Number(n.toFixed(1))} effective sets</span></div>`).join('')}</div>`;}
 function renderProgram(){if(!state.rows.length)return empty('#program');const t=recentTemplates();$('#program').innerHTML=`<div class="card"><h3>Inferred current program</h3><p class="muted small">CSV exports contain completed workouts, not your saved Hevy routines. These cards are inferred from the latest occurrence of recent workout names.</p></div><div class="list" style="margin-top:10px">${t.map(x=>`<div class="row"><div><div class="title">${esc(x.title)}</div><div class="sub">Latest: ${fmtDate(x.date)} · ${x.exercises.length} exercises</div><div class="sub">${x.exercises.map(esc).join(' · ')}</div></div><span class="pill warn">inferred</span></div>`).join('')}</div>`;}
 function renderExercises(){if(!state.rows.length)return empty('#exercises');const stats=exerciseStats();$('#exercises').innerHTML=`<p class="muted small">Tap an exercise to adjust its muscle contributions. Values are fractional set-credit estimates, not a measurement of muscle activation.</p><div class="list">${stats.map(x=>{const r=x.recent[0];return `<div class="row muscle-edit" data-exercise="${esc(x.name)}" tabindex="0" role="button" title="Edit muscle mapping"><div><div class="title">${esc(x.name)}</div><div class="sub">${esc(x.muscle)} · ${x.sets.length} recorded sets</div><div class="sub">Latest: ${r.kg!=null?r.kg.toFixed(1)+' kg × ':''}${r.reps??'—'} reps${r.rpe!=null?' · RPE '+r.rpe:''} · ${fmtDate(r.date)}</div></div><span class="pill ${x.best?'good':''}">${x.best&&x.best.kg!=null?x.best.kg.toFixed(1)+' kg':'history'}</span></div>`}).join('')}</div>`;$('.muscle-edit').forEach(el=>{el.onclick=()=>{try{editMuscle(el.dataset.exercise)}catch(e){alert(e.message)}};el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();el.click()}}});}
@@ -70,4 +70,4 @@ $('#csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if
 $$('.tab').forEach(b=>b.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));$$('.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#'+b.dataset.tab).classList.add('active');});
 $('#installHint').onclick=()=>alert('On iPhone: tap Safari’s Share button, then “Add to Home Screen.”');
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
-renderAll();loadData();
+renderAll();loadData();refreshCatalog();
