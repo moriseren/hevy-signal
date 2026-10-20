@@ -14,4 +14,34 @@ const ed=T.convertEDB({name:'barbell bench press',targetMuscles:['pectorals'],se
 assert.equal(ed.secondary[0],'triceps');
 const counted=T.count([{exercise:'Seated Leg Curl'},{exercise:'Seated Leg Curl'}]);
 assert.equal(counted.Hamstrings.primary,2);
+
+const extraCases={
+ 'Archer Pull':'Rear delts',
+ 'Serratus Press':'Serratus anterior',
+ 'Scapular Pulldown':'Lower traps',
+ 'Suitcase Front Carry (Dumbbell)':'Obliques',
+ 'Farmers Walk':'Upper traps',
+ 'Walking':'Cardio / walking',
+ 'Lat Pulldown - Close Grip (Cable)':'Lats',
+ 'Sideways B-Stance Cable RDL':'Hamstrings',
+ 'Recline Hip Abduction (Machine)':'Glute med/min',
+ 'Romanian Deadlift (Dumbbell) B-Stance':'Hamstrings',
+ 'Standing Cable Glute Kickbacks':'Glute max',
+ 'Glute Kickback (Machine)':'Glute max',
+ 'Triceps Kickback (Dumbbell)':'Triceps',
+ 'Arnold Press (Dumbbell)':'Front delts',
+ 'Pec Deck Fly (Machine)':'Chest',
+ 'Upright Row (Barbell)':'Side delts',
+ 'Back Extension (Weighted)':'Spinal erectors',
+ 'Hip Adduction (Machine)':'Adductors',
+ 'Hip Abduction (Machine)':'Glute med/min',
+ 'Calf Press (Machine)':'Calves',
+ 'Cable Woodchop':'Obliques'
+};
+for(const [ex,muscle] of Object.entries(extraCases)) {
+ assert.ok(T.profile(ex).primary.includes(muscle),ex+' should map to '+muscle);
+}
+assert.equal(T.count([{exercise:'Walking'}])['Cardio / walking'],undefined);
+assert.equal(T.profile('Mystery movement 999').confidence,'unmapped');
+
 console.log('Hevy Muscle Engine unit tests passed');
