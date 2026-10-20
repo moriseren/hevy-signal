@@ -82,10 +82,17 @@
   // These are anatomical heuristics, not database-verified classifications.
   // Order is important: narrow variations precede general compound patterns.
   const localRules=[
+    [/^archer pull$/i,[['Rear delts'],['Mid traps/rhomboids','External rotators'],[]]],
+    [/^serratus press\b/i,[['Serratus anterior'],['Chest'],[]]],
+    [/^scapular (pull.?down|depression)|^straight.arm scapular (pull|depress)/i,[['Lower traps','Lats'],['Pectoralis minor'],[]]],
+    [/^suitcase front carry/i,[['Obliques','Abs'],['Forearms','Front delts'],[]]],
+    [/^suitcase (carry|walk|hold)/i,[['Obliques','Abs'],['Forearms','Quadratus lumborum'],[]]],
+    [/^(walk|walking|treadmill walk|brisk walk)(ing)?$/i,[['Cardio / walking'],[],[]]],
+
     [/hip adduct|adduction|adductor machine|copenhagen plank|copenhagen adduct/i,[['Adductors'],[],[]]],
     [/hip abduct|abduction|abductor machine|clamshell|clam shell|lateral band walk|monster walk|side lying hip raise|side lying leg raise/i,[['Glute med/min'],['Glute max'],[]]],
     [/hip thrust|glute bridge|glute drive|frog pump|kas bridge/i,[['Glute max'],['Hamstrings'],[]]],
-    [/glute kickback|cable kickback|donkey kick|quadruped hip extension|standing hip extension/i,[['Glute max'],['Hamstrings'],[]]],
+    [/glute kickback|cable kickback|donkey kick|quadruped hip extension|hip extension|hip ext\b/i,[['Glute max'],['Hamstrings'],[]]],
     [/cable pull through|pull through|reverse hyperextension|reverse hyper/i,[['Glute max'],['Hamstrings'],['Spinal erectors']]],
     [/45.degree (back |hip )?extension|back extension|hyperextension|hip hyperextension/i,[['Spinal erectors','Glute max'],['Hamstrings'],[]]],
     [/leg extension|reverse nordic|sissy squat|spanish squat/i,[['Quads — vasti','Quads — rectus femoris'],[],[]]],
@@ -101,12 +108,12 @@
     [/lateral raise|side raise|cable y.?raise|lean.?away raise|scaption/i,[['Side delts'],['Upper traps'],[]]],
     [/front raise|front plate raise/i,[['Front delts'],[],[]]],
     [/external rotation|rotator cuff|cuban press/i,[['External rotators'],['Rear delts'],[]]],
-    [/shrug|farmer.s (walk|carry)|farmer walk|farmer carry/i,[['Upper traps'],['Forearms'],[]]],
+    [/shrug|farmer.?s? (walk|carry|hold)/i,[['Upper traps'],['Forearms'],[]]],
     [/upright row|high pull/i,[['Side delts','Upper traps'],['Biceps'],[]]],
     [/arnold press|overhead press|shoulder press|military press|landmine press|push press/i,[['Front delts'],['Triceps','Side delts'],[]]],
     [/chest.supported row|high row|wide.grip row|upper.back row|rear delt row|face.away row/i,[['Mid traps/rhomboids','Rear delts'],['Lats','Biceps'],[]]],
     [/t.?bar row|inverted row|horizontal row|seal row|bent.?over row|seated row|one.arm row|single.arm row|machine row|cable row|dumbbell row|barbell row|\brow\b/i,[['Lats','Mid traps/rhomboids'],['Rear delts','Biceps'],[]]],
-    [/lat pulldown|pull.?up|chin.?up|pull.?over|straight.arm pulldown|lat prayer|scapular pull/i,[['Lats'],['Biceps'],[]]],
+    [/lat pulldown|pull.?down|pull.?up|chin.?up|pull.?over|straight.arm pulldown|lat prayer|scapular pull/i,[['Lats'],['Biceps'],[]]],
     [/close.grip bench|close.grip press|jm press|tricep dip|triceps dip|bench dip/i,[['Triceps'],['Chest','Front delts'],[]]],
     [/chest dip|weighted dip|parallel bar dip|\bdips?\b/i,[['Chest','Triceps'],['Front delts'],[]]],
     [/incline (dumbbell |barbell |smith |machine )?(bench|press|chest)|incline bench|incline dumbbell (bench|press|fly)/i,[['Upper chest'],['Front delts','Triceps'],[]]],
@@ -168,6 +175,7 @@
   }
   function count(rows,{secondaryCredit=0}={}){
     const output={};for(const row of rows){const p=profile(row.exercise);
+      if(p.primary.length===1 && p.primary[0]==='Cardio / walking')continue;
       for(const name of p.primary){const x=output[name]||(output[name]={primary:0,secondary:0,stabilizer:0,effective:0});x.primary+=1;}
       for(const name of p.secondary){const x=output[name]||(output[name]={primary:0,secondary:0,stabilizer:0,effective:0});x.secondary+=1;}
       for(const name of p.stabilizers){const x=output[name]||(output[name]={primary:0,secondary:0,stabilizer:0,effective:0});x.stabilizer+=1;}
