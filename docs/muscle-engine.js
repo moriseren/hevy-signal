@@ -11,7 +11,7 @@
   const EDB='https://oss.exercisedb.dev/api/v1/exercises';
   const OVERRIDE_KEY='hevy-signal-muscle-profiles-v2';
   const OLD_KEY='hevy-signal-muscle-overrides-v2';
-  const CACHE_KEY='hevy-signal-wger-v2';
+  const CACHE_KEY='hevy-signal-wger-v3';
   let wger=[],edb=[],status='Local classification only',onlineError='';
   const mayStore=typeof localStorage!=='undefined';
   const read=(key,fallback)=>{if(!mayStore)return fallback;try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
@@ -204,14 +204,15 @@
       wger=record.rows;status='wger cached catalog';}
     else{
       try{
-        const items=[];let url=WGER+'?language=2&limit=100&offset=0';let page=0;
+        const items=[];let url=WGER+'?language=2&limit=100&offset=0';let page=0,truncated=false;
         while(url&&page<30){const data=await timeoutFetch(url);if(!data||!Array.isArray(data.results))throw Error('Unexpected wger API response');items.push(...data.results.map(convertWger).filter(Boolean));page++;
-          url=data.next&&page<30?new URL(data.next,WGER).href:null;
+          if(data.next && page>=30){truncated=true;url=null;}
+          else url=data.next?new URL(data.next,WGER).href:null;
           if(url&&!url.startsWith('https://wger.de/'))throw Error('Unexpected pagination host');
         }
         if(!items.length)throw Error('No English exercises returned');
         wger=items;write(CACHE_KEY,{when:Date.now(),rows:items});
-        status=page>=30&&url?'wger catalog partially loaded (page limit)':'wger exercise catalog loaded';onlineError='';
+        status=truncated?'wger catalog partially loaded (page limit)':'wger exercise catalog loaded';onlineError='';
       }catch(e){onlineError=String(e.message||e);status=wger.length?'wger cached catalog (offline)':'Offline local rules (wger unavailable)';}
     }
     if(useExerciseDB){
