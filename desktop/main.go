@@ -1686,7 +1686,7 @@ func (a *App) chatGPTBrief() string {
 		if strings.TrimSpace(m.Notes) != "" {
 			fmt.Fprintf(&b, "- Notes: %s\n", m.Notes)
 		}
-		fmt.Fprintf(&b,"- Anatomy source: %s · match: %s · catalog exercise: %s · requires review: %t\\n",m.AnatomySource,m.AnatomyConfidence,m.AnatomyMatched,m.AnatomyNeedsReview)
+		fmt.Fprintf(&b,"- Anatomy source: %s · match: %s · catalog exercise: %s · requires review: %t\n",m.AnatomySource,m.AnatomyConfidence,m.AnatomyMatched,m.AnatomyNeedsReview)
 		fmt.Fprintf(&b, "- Signal: %s — %s\n- Rationale: %s\n", r.Status, r.Headline, r.Rationale)
 		groups := a.sessionsFor(m.TemplateID, 4)
 		if len(groups) == 0 {
