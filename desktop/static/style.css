@@ -14,3 +14,9 @@ footer strong{color:#aeb6c0} footer{line-height:1.5}
 .file-button{background:#1c2229!important;color:#c8ced6!important;border-color:#303842!important}
 .settings hr{border-top-color:#303842!important}
 .source-notice{margin:0 0 16px;padding:14px 16px;border:1px solid #4d4330;border-radius:14px;background:#1b1812;color:#d9c79e;line-height:1.5}.source-choice{padding:14px 0}.source-choice p{color:#aeb6c0;line-height:1.5}.csv-import-button{margin-left:10px}@media(max-width:800px){.csv-import-button{margin-left:0;margin-top:10px}}
+
+.program-selector{display:flex;align-items:flex-start;justify-content:center;flex-direction:column;gap:6px;border:1px solid #323b4d;background:#181d26;padding:16px;border-radius:12px;margin:12px 0 18px}
+.program-selector label{font-size:14px}
+.program-selector select{width:min(100%,480px);font-size:15px;color:#f4f7fc;background:#252d38;border:1px solid #60728a;border-radius:9px;padding:10px 12px;min-height:43px;cursor:pointer}
+.program-selector select:disabled{cursor:not-allowed;opacity:.65}
+.program-selector p{margin:4px 0 0;line-height:1.5;max-width:650px}
