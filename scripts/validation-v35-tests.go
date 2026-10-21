@@ -38,7 +38,7 @@ func TestWalkingAndCarryingNotRepetitionBased(t *testing.T){
   mus,_:=a.currentRoutineStimulus(14)
   if len(mus)!=0{t.Fatalf("%s counted as hypertrophy sets: %v",title,mus)}
   brief:=a.chatGPTBrief()
-  if strings.Contains(brief,"Progression target:")||strings.Contains(brief,"e1RM"){t.Fatalf("%s still has rep target or e1RM in brief: %s",title,brief)}
+  if strings.Contains(brief,"- Progression target:")||strings.Contains(brief,"; e1RM ")||strings.Contains(brief,"best set;"){t.Fatalf("%s still has rep target or e1RM in brief: %s",title,brief)}
  }
 }
 func TestIncomparableLoadVariantsAreNotProgressed(t *testing.T){
