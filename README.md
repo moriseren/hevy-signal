@@ -4,19 +4,19 @@ Hevy Signal is a local training-analysis companion for Hevy. Hevy remains your w
 
 > Public beta. Independent project; not affiliated with or endorsed by Hevy.
 
-## Download — v3.4 Mac desktop
+## Download — v3.5 Mac desktop
 
-**[Download Hevy Signal v3.4](https://github.com/moriseren/hevy-signal/releases/tag/v3.4)**
+**[Hevy Signal v3.5: verified Mac release](https://github.com/moriseren/hevy-signal/releases/tag/v3.5)**
 
-For Apple Silicon M1/M2/M3/M4 and newer Macs, use [the Apple Silicon ZIP](https://github.com/moriseren/hevy-signal/releases/download/v3.4/Hevy-Signal-v3.4-macOS-Apple-Silicon.zip). For Intel Macs, use [the Intel ZIP](https://github.com/moriseren/hevy-signal/releases/download/v3.4/Hevy-Signal-v3.4-macOS-Intel.zip).
+- [Apple Silicon — M1, M2, M3, M4 and newer](https://github.com/moriseren/hevy-signal/releases/download/v3.5/Hevy-Signal-v3.5-macOS-Apple-Silicon.zip)
+- [Intel Mac](https://github.com/moriseren/hevy-signal/releases/download/v3.5/Hevy-Signal-v3.5-macOS-Intel.zip)
+- [Source and SHA-256 checksums](https://github.com/moriseren/hevy-signal/releases/tag/v3.5)
 
-**What changed:** The app now refreshes *all automatically generated exercise-muscle classifications* on startup, not just previously unmapped exercises, while preserving manually edited muscle contributors, notes, programming settings and execution variants. The app repairs v3.3 automatically generated classifications that were mistakenly marked manual. An in-app **Re-map all automatic exercises** control offers an optional exact-name lookup using the wger catalog. Unknown movements remain flagged rather than guessed.
+Version 3.5 updates the existing Mac app. Automatically assigned chest and shoulder press mappings now recognize triceps as a synergist instead of biceps; any *manually entered* incorrect pressing mappings are shown for review instead of silently overwritten. Quadriceps/rectus femoris/vasti now roll into one canonical quadriceps group without duplicate volume credit. Walking and loaded carries receive duration, distance and load guidance rather than repetitions/e1RM progression; their exposures are not misclassified as hypertrophy sets. Cable abduction and glute kickback historical load differences greater than 2.25× require verification of the equipment/setup or execution variant before Signal offers a strength-trend conclusion.
 
-On first v3.4 startup, the previous `~/.hevy-signal/data.json` is backed up once to `~/.hevy-signal/data-before-v3.4-remap.json` before changes. Your Hevy history and API key stay on your Mac.
+The app still preserves your workout history, saved Hevy key, and manual mappings. Local backup from v3.4 is under `~/.hevy-signal/data-before-v3.4-remap.json` if created. Quit the old app, extract the architecture-specific download, then replace the old Hevy Signal.app in Applications. These are unsigned beta builds and macOS may require Control-click → Open the first time. All original and new Go tests passed, and both Mac architectures compiled; runtime Mac GUI testing remains pending.
 
-To upgrade, quit the old version, unzip the matching architecture, and replace the old **Hevy Signal.app** in Applications. As this is an unsigned beta, macOS may require Control-click → Open. Exercise-name classifications are evidence-informed or heuristic estimates, not validated measurements of each individual's muscle recruitment. macOS runtime GUI verification is pending; Go tests and both Mac cross-compilations passed.
-
-The previous [v3.3 release](https://github.com/moriseren/hevy-signal/releases/tag/v3.3) and [Windows v3.2 release](https://github.com/moriseren/hevy-signal/releases/tag/v3.2) remain available.
+The earlier [v3.4 Mac release](https://github.com/moriseren/hevy-signal/releases/tag/v3.4) and [v3.2 Windows release](https://github.com/moriseren/hevy-signal/releases/tag/v3.2) remain available.
 
 ## iPhone / mobile web app
 
