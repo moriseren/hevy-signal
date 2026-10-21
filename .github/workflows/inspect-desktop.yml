@@ -35,6 +35,7 @@ jobs:
           echo '=== FRONTEND BINDINGS ==='; grep -nE 'unmapped|major_muscles|supporting_muscles|exportMappings|importMappings|async function|const .*muscle' static/app.js | head -55
           echo '=== BUILD INSTRUCTIONS ==='; cat README-FIRST.txt
           echo '=== GO ENVS ==='; ls -la; head -40 README.md
+          echo '=== TRAINING BRIEF ==='; sed -n '1340,1450p' main.go
           echo '=== USER SIGNAL FUNCTION LOCATIONS ==='; grep -n -E '^func \(a \*App\) (recFor|currentRoutineStimulus|chatGPTBrief|sessionsFor)|^type Rec struct|^func summary' main.go
           echo '=== SIGNALS IMPLEMENTATION ==='; sed -n '940,1165p' main.go
           echo '=== UI RENDER ==='; sed -n '25,105p' static/app.js
