@@ -4,19 +4,23 @@ Hevy Signal is a local training-analysis companion for Hevy. Hevy remains your w
 
 > Public beta. Independent project; not affiliated with or endorsed by Hevy.
 
-## Download — v3.5 Mac desktop
+## Download — v3.6 Mac desktop
 
-**[Hevy Signal v3.5: verified Mac release](https://github.com/moriseren/hevy-signal/releases/tag/v3.5)**
+**[Hevy Signal v3.6 — Mac release](https://github.com/moriseren/hevy-signal/releases/tag/v3.6)**
 
-- [Apple Silicon — M1, M2, M3, M4 and newer](https://github.com/moriseren/hevy-signal/releases/download/v3.5/Hevy-Signal-v3.5-macOS-Apple-Silicon.zip)
-- [Intel Mac](https://github.com/moriseren/hevy-signal/releases/download/v3.5/Hevy-Signal-v3.5-macOS-Intel.zip)
-- [Source and SHA-256 checksums](https://github.com/moriseren/hevy-signal/releases/tag/v3.5)
+- [Apple Silicon Mac (M1, M2, M3, M4 and newer)](https://github.com/moriseren/hevy-signal/releases/download/v3.6/Hevy-Signal-v3.6-macOS-Apple-Silicon.zip)
+- [Intel Mac](https://github.com/moriseren/hevy-signal/releases/download/v3.6/Hevy-Signal-v3.6-macOS-Intel.zip)
+- [Source archive and checksums](https://github.com/moriseren/hevy-signal/releases/tag/v3.6)
 
-Version 3.5 updates the existing Mac app. Automatically assigned chest and shoulder press mappings now recognize triceps as a synergist instead of biceps; any *manually entered* incorrect pressing mappings are shown for review instead of silently overwritten. Quadriceps/rectus femoris/vasti now roll into one canonical quadriceps group without duplicate volume credit. Walking and loaded carries receive duration, distance and load guidance rather than repetitions/e1RM progression; their exposures are not misclassified as hypertrophy sets. Cable abduction and glute kickback historical load differences greater than 2.25× require verification of the equipment/setup or execution variant before Signal offers a strength-trend conclusion.
+### NEW: Choose your Hevy program folder
 
-The app still preserves your workout history, saved Hevy key, and manual mappings. Local backup from v3.4 is under `~/.hevy-signal/data-before-v3.4-remap.json` if created. Quit the old app, extract the architecture-specific download, then replace the old Hevy Signal.app in Applications. These are unsigned beta builds and macOS may require Control-click → Open the first time. All original and new Go tests passed, and both Mac architectures compiled; runtime Mac GUI testing remains pending.
+Hevy Signal's **Current program** screen now includes **Active program folder**. Connect your Hevy Developer API key, click **Sync Hevy**, and choose your saved **Cut**, **Hypertrophy**, or another Hevy routine folder from the dropdown. Switching updates the active routines, exercise setup, progression signals, muscle-volume totals, and ChatGPT handoff brief. Choose **All saved routines** to return to the previous full-program view. The selection persists between launches; syncing never deletes other routines or workout history.
 
-The earlier [v3.4 Mac release](https://github.com/moriseren/hevy-signal/releases/tag/v3.4) and [v3.2 Windows release](https://github.com/moriseren/hevy-signal/releases/tag/v3.2) remain available.
+When a folder is selected, Signal only uses workout sets explicitly tied by Hevy's \`routine_id\` to a routine in that folder. A workout not associated with a saved routine remains stored, but is excluded from that folder's strength comparisons and muscle-volume totals to avoid mixing programs. A Hevy **workout CSV does not contain saved routine folders**, so this feature requires an API-based Hevy sync.
+
+The desktop source is now editable under [\`desktop/\`](https://github.com/moriseren/hevy-signal/tree/main/desktop) and is covered by program-isolation regression tests. Both Apple Silicon and Intel binaries compiled and all Go tests passed. The unsigned macOS beta may require Control-click → Open. Quit your previous version, unzip v3.6, and replace the existing Hevy Signal.app; your prior app data stays in \`~/.hevy-signal\`. Mac graphical testing remains pending.
+
+The earlier [v3.5 Mac release](https://github.com/moriseren/hevy-signal/releases/tag/v3.5) remains available.
 
 ## iPhone / mobile web app
 
