@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const expectedVersion = "3.5-volume-validation"
+const expectedVersion = "3.6-folder-programs"
 
 type health struct {
 	OK      bool   `json:"ok"`
