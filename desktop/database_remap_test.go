@@ -100,3 +100,32 @@ func TestWgerNormalizedMappingsSurviveStartupHeuristics(t *testing.T){
   t.Fatalf("wger mapping was overwritten by legacy startup heuristic: %+v",after)
  }
 }
+
+func TestCuratedCorrectionsDoNotPretendToBeWger(t *testing.T){
+ a:=folderTestApp(t)
+ cases:=[]struct{id,title string; primary,secondary []string}{
+  {"chest","Chest Press (Machine)",[]string{"Chest"},[]string{"Triceps","Front delts"}},
+  {"adduction","Hip Adduction (Machine)",[]string{"Adductors"},nil},
+  {"legpress","Leg Press (Machine)",[]string{"Quads","Glute max"},[]string{"Adductors"}},
+  {"treadmill","Treadmill",[]string{"Cardio / walking"},nil},
+ }
+ suggestions:=[]dbSuggestion{}
+ for _,x:=range cases{
+  a.store.Meta[x.id]=Meta{TemplateID:x.id,ExerciseTitle:x.title,MajorMuscles:[]string{"Biceps"},AutoTagged:false,
+   Notes:"do not change progression",MinReps:9,MaxReps:15,TargetSets:3}
+  suggestions=append(suggestions,dbSuggestion{TemplateID:x.id,ExerciseTitle:x.title,Matched:x.title,
+   Source:"curated",Confidence:"curated",Primary:x.primary,Secondary:x.secondary})
+ }
+ if err:=a.saveStore();err!=nil {t.Fatal(err)}
+ status,result:=remapReq(t,a,true,suggestions)
+ if status!=200 || result["curatedMapped"]!=float64(len(cases)){t.Fatalf("curated mapping not accepted: %d %+v",status,result)}
+ for _,x:=range cases{
+  got:=a.store.Meta[x.id]
+  if !strings.HasPrefix(got.AnatomySource,"Biomechanics crosswalk")||got.AnatomyConfidence!="estimated"||
+  got.AnatomyNeedsReview||!got.AutoTagged {t.Fatalf("%s source misrepresented: %+v",x.title,got)}
+  if strings.Join(got.MajorMuscles,",")!=strings.Join(x.primary,",") {t.Fatalf("%s primary: %v",x.title,got.MajorMuscles)}
+  if got.Notes!="do not change progression"||got.MinReps!=9||got.TargetSets!=3 {t.Fatalf("program edited: %+v",got)}
+ }
+ if !isNonRepTitle("Treadmill")||!isNonRepTitle("Farmers Walk"){t.Fatal("conditioning or carries can enter repetition based hypertrophy totals")}
+ if isAutoEditable(a.store.Meta["legpress"]){t.Fatal("startup keyword rules can overwrite curated source")}
+}
