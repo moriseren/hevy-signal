@@ -33,6 +33,12 @@ jobs:
           echo '=== MAIN 1550-1720 ==='; sed -n '1550,1720p' main.go
           echo '=== LAUNCHER ==='; head -100 cmd/macos-launcher/main.go
           echo '=== FRONTEND BINDINGS ==='; grep -nE 'unmapped|major_muscles|supporting_muscles|exportMappings|importMappings|async function|const .*muscle' static/app.js | head -55
+          echo '=== FOLDER ROUTINE FETCH LOCATIONS ==='; grep -n -E 'func.*(routine|Routine|hevy|Hevy|sync|Sync)|routine_folders|FolderID|folder_id|/api/sync|/api/hevy' main.go | head -140
+          echo '=== ROUTINE FETCH BLOCK 1 ==='; sed -n '370,650p' main.go
+          echo '=== ROUTINE FETCH BLOCK 2 ==='; sed -n '650,900p' main.go
+          echo '=== ROUTINE API HANDLERS ==='; sed -n '1440,1550p' main.go
+          echo '=== CURRENT UI HTML ==='; sed -n '1,185p' static/index.html
+          echo '=== FRONTEND PROGRAM ==='; sed -n '1,125p' static/app.js
           echo '=== BUILD INSTRUCTIONS ==='; cat README-FIRST.txt
           echo '=== GO ENVS ==='; ls -la; head -40 README.md
           echo '=== TRAINING BRIEF ==='; sed -n '1340,1450p' main.go
