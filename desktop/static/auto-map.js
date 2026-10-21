@@ -31,28 +31,32 @@
       let notMatched=0;
       for(const ex of exercises){
         if(!ex.template_id || !ex.exercise_title)continue;
-        const best=window.HevyMuscles.databaseProfile(ex.exercise_title);
-        if(!best || best.source.name!=='wger' || best.confidence!=='high'){
+        // A specifically reviewed movement-family rule outranks ambiguous
+        // wger exercise titles (e.g. adduction incorrectly returned as glutes).
+        const curated=window.HevyCurated?.lookup(ex.exercise_title);
+        const best=curated||window.HevyMuscles.databaseProfile(ex.exercise_title);
+        if(!best || !best.primary?.length ||
+          !(curated || (best.source.name==='wger'&&best.confidence==='high'))){
           notMatched++;continue;
         }
         suggestions.push({
           template_id:ex.template_id,
           exercise_title:ex.exercise_title,
           matched:best.matched,
-          source:'wger',
-          confidence:'high',
+          source:curated?'curated':'wger',
+          confidence:curated?'curated':'high',
           primary:best.primary,
           secondary:best.secondary
         });
       }
       if(!suggestions.length){
-        throw Error('No exercises matched wger reliably. Previous classifications were preserved for safety. Check exercise names and catalog coverage.');
+        throw Error('No exercises matched the referenced databases or reviewed movement patterns. Previous classifications were preserved for safety. Check exercise names and catalog coverage.');
       }
-      report('Applying '+suggestions.length+' database matches, including replacements for manual maps…');
+      report('Applying '+suggestions.length+' wger and documented biomechanics matches, including replacements for previous manual maps…');
       const res=await localAPI('/api/database-remap',{
         method:'POST',body:JSON.stringify({catalog_loaded:true,suggestions})
       });
-      report(res.matched+' / '+res.checked+' exercises matched to wger; '+
+      report(res.wgerMapped+' wger matches + '+res.curatedMapped+' biomechanics crosswalk matches / '+res.checked+' exercises; '+
         res.needsReview+' need verification and are excluded from muscle-volume totals. '+
         res.changed+' classifications updated. No manual mapping was exempted.');
       if(typeof window.load==='function')await window.load();
@@ -70,11 +74,11 @@
     wrap.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 0';
     button=document.createElement('button');
     button.type='button';
-    button.textContent='Rebuild ALL muscle mappings from wger';
+    button.textContent='Rebuild anatomy (wger + biomechanics crosswalk)';
     status=document.createElement('span');
     status.setAttribute('role','status');
     status.style.cssText='font-size:12px;color:#bac5d2;max-width:610px';
-    status.textContent='Includes manual maps. Unmatched exercises stay flagged and do not contribute to modeled muscle totals.';
+    status.textContent='Includes all previous manual maps. Displays whether a mapping is sourced from wger or an anatomical movement-family estimate.';
     wrap.append(button,status);
     editor.parentNode.insertBefore(wrap,editor);
     button.addEventListener('click',remapAll);
