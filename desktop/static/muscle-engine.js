@@ -148,6 +148,49 @@
     const obj=overrides();obj[ex]=all;write(OVERRIDE_KEY,obj);return all;
   }
   function clearOverride(ex){const obj=overrides();delete obj[ex];write(OVERRIDE_KEY,obj);}
+  // Database-only lookup: intentionally bypass local rules, manual overrides,
+  // and previously imported muscle maps. Use for authoritative bulk remapping.
+  // This is exercise-name confidence, not validation of individual technique.
+  const equipmentMarker=s=>{
+    const x=clean(s);
+    const found=['dumbbell','barbell','kettlebell','cable','smith','machine','band','bodyweight']
+      .filter(t=>new RegExp('\\b'+t+'\\b').test(x));
+    return found;
+  };
+  function databaseProfile(ex){
+    const wanted=clean(ex);
+    if(!wanted||!wger.length)return null;
+    const candidates=[];
+    for(const item of wger) {
+      for(const name of item.titles) {
+        const candidate=clean(name);
+        const eq=equipmentMarker(ex),other=equipmentMarker(name);
+        // Explicitly contradictory equipment variants cannot be silently
+        // treated as the same exercise, even when the remaining words match.
+        if(eq.length&&other.length&&!eq.some(x=>other.includes(x)))continue;
+        // Prevent side-to-side, single-leg, incline/decline variant collapse.
+        const modifiers=['singleleg','incline','decline','sumo','close grip','wide grip'];
+        if(modifiers.some(m=>wanted.includes(m)!==candidate.includes(m)))continue;
+        const similarity=score(ex,name);
+        // 0.97+ allows e.g. Leg Extensions vs Leg Extension (Machine),
+        // but not a broadly similar row or different exercise.
+        if(similarity<.97)continue;
+        if(!Array.isArray(item.primary)||!item.primary.length)continue;
+        candidates.push({item,name,similarity});
+      }
+    }
+    candidates.sort((a,b)=>b.similarity-a.similarity);
+    if(!candidates.length)return null;
+    const best=candidates[0];
+    const ties=candidates.filter(c=>c.similarity>=best.similarity-.01);
+    if(ties.some(x=>JSON.stringify(x.item.primary.slice().sort())!==JSON.stringify(best.item.primary.slice().sort())))return null;
+    const p=pack(best.item.primary,best.item.secondary,[],{name:'wger',url:'https://wger.de/api/v2/exerciseinfo/'+best.item.id+'/'},'high',best.name,
+      'Exact or strongly normalized wger name match. Variations in exercise setup may change emphasis.');
+    // Enforce canonical quad grouping rather than counting subhead plus whole.
+    const normParts=parts=>unique(parts.map(x=>/^(quads|quads [—-]|rectus femoris|vastus|quadriceps)/i.test(x)?'Quads':x));
+    p.primary=normParts(p.primary);p.secondary=normParts(p.secondary).filter(x=>!p.primary.includes(x));
+    return p;
+  }
   function profile(ex){
     const custom=overrides()[ex];if(custom)return custom;
     const legacy=read(OLD_KEY,{})[ex];if(Array.isArray(legacy)){
@@ -249,5 +292,5 @@
     return {status,wgerCount:wger.length,exerciseDBCount:edb.length,error:onlineError};
   }
   function diagnostics(){return {status,wgerCount:wger.length,exerciseDBCount:edb.length,error:onlineError};}
-  return {profile,count,sync,score,clean,setOverride,clearOverride,diagnostics,convertWger,convertEDB,sourceNotes:'wger data are per-item CC licensed. ExerciseDB free API is non-commercial, attribution required, no persistent caching. Secondary counts are exposure, not proven fractions of hypertrophy.'};
+  return {profile,databaseProfile,count,sync,score,clean,setOverride,clearOverride,diagnostics,convertWger,convertEDB,sourceNotes:'wger data are per-item CC licensed. ExerciseDB free API is non-commercial, attribution required, no persistent caching. Secondary counts are exposure, not proven fractions of hypertrophy.'};
 });
