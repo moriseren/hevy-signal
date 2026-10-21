@@ -85,3 +85,18 @@ func TestPublicWgerProxyRejectsBadPaginationBeforeOutboundRequests(t *testing.T)
   if res.Code!=400{t.Fatalf("bad catalog page should not trigger network: %q -> %d",query,res.Code)}
  }
 }
+
+func TestWgerNormalizedMappingsSurviveStartupHeuristics(t *testing.T){
+ a:=folderTestApp(t)
+ a.store.Meta["wger-press"]=Meta{TemplateID:"wger-press",ExerciseTitle:"Shoulder Press (Dumbbell)",
+  MajorMuscles:[]string{"Front delts"},SupportingMuscles:[]string{"Triceps"},
+  AutoTagged:true,AnatomySource:"wger + biomechanical normalization",AnatomyConfidence:"high"}
+ before:=a.store.Meta["wger-press"]
+ a.repairAutomaticMappings()
+ after:=a.store.Meta["wger-press"]
+ if after.AnatomySource!=before.AnatomySource||
+  strings.Join(after.MajorMuscles,",")!=strings.Join(before.MajorMuscles,",")||
+  strings.Join(after.SupportingMuscles,",")!=strings.Join(before.SupportingMuscles,","){
+  t.Fatalf("wger mapping was overwritten by legacy startup heuristic: %+v",after)
+ }
+}
