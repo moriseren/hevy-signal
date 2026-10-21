@@ -898,7 +898,7 @@ func (a *App) importHevyCSV(r io.Reader) (int, int, int, error) {
 // v3.3's browser catalog accidentally marked machine-generated classifications
 // as manual, recognizable by its distinctive Movement marker.
 func isAutoEditable(m Meta) bool {
-	if m.AnatomySource=="wger" || m.AnatomyNeedsReview {return false}
+	if strings.HasPrefix(m.AnatomySource,"wger") || m.AnatomyNeedsReview {return false}
 	unknown := len(m.MajorMuscles) == 0 ||
 		(len(m.MajorMuscles) == 1 && strings.EqualFold(strings.TrimSpace(m.MajorMuscles[0]), "Unmapped"))
 	defaultUnknown := unknown && (m.Movement == "" || m.Movement == "Unmapped")
