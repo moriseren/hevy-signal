@@ -16,7 +16,7 @@ const examples=[
  {id:13,translations:[{language:2,name:"Leg Curl"}],
   muscles:[{name_en:"Biceps femoris"}],muscles_secondary:[]}
 ];
-global.fetch=async()=>({ok:true,json:async()=>({results:examples,next:null})});
+global.fetch=async(url)=>{assert.match(url,/^\/api\/reference\/wger\/exerciseinfo\?/,'wger fetch must use localhost proxy');return {ok:true,json:async()=>({results:examples,next:null})}};
 const T=require('./static/muscle-engine.js');
 (async()=>{
  const d=await T.sync({useExerciseDB:false,force:true});
