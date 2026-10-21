@@ -17,7 +17,7 @@ jobs:
       - name: Download released source
         shell: bash
         run: |
-          curl -fLsS --retry 3 -o /tmp/source.zip "https://github.com/moriseren/hevy-signal/releases/download/v3.2/Hevy-Signal-v3.2-source.zip"
+          curl -fLsS --retry 3 -o /tmp/source.zip "https://github.com/moriseren/hevy-signal/releases/download/v3.2/Hevy-Signal-v3.3-source.zip"
           unzip -l /tmp/source.zip | head -65
           mkdir -p /tmp/hevy-src
           unzip -q /tmp/source.zip -d /tmp/hevy-src
@@ -34,4 +34,10 @@ jobs:
           echo '=== FRONTEND BINDINGS ==='; grep -nE 'unmapped|major_muscles|supporting_muscles|exportMappings|importMappings|async function|const .*muscle' static/app.js | head -55
           echo '=== BUILD INSTRUCTIONS ==='; cat README-FIRST.txt
           echo '=== GO ENVS ==='; ls -la; head -40 README.md
+          echo '=== AUTOTAGGED INTERACTIONS ==='; grep -n -C 9 'AutoTagged' main.go
+          echo '=== SAVE / LOAD ==='; sed -n '185,310p' main.go
+          echo '=== USER POST / IMPORT ==='; sed -n '1470,1560p' main.go
+          echo '=== MAPPING REPAIR ==='; grep -n -A 32 'func (a \*App) repairUnmapped' main.go
+          echo '=== MODULE / VERSION / UI ==='; head -55 main.go; head -50 static/app.js
+          
 
