@@ -1,63 +1,68 @@
-/* Hevy Signal v3.4: refresh only the machine-assigned anatomy of exercises.
- * Manual classification is immutable to this module. Server verifies each request. */
+/* Hevy Signal v3.7. Database-first muscle mapping; includes previous manual maps.
+ * Hevy workout history and API keys never leave the local application.
+ * wger public exercise catalog is downloaded; exercise names matched locally.
+ */
 (()=>{
-  let active=false, button=null,status=null;
-  const unknown=m=>!Array.isArray(m.major_muscles)||m.major_muscles.length===0||
-    (m.major_muscles.length===1&&String(m.major_muscles[0]).trim().toLowerCase()==='unmapped');
-  const automatic=m=>m.auto_tagged===true ||
-    (unknown(m)&&(m.movement==='Unmapped'||!m.movement)) ||
-    String(m.movement||'').startsWith('Automatically classified');
-  async function request(url,opts={}){
-    const r=await fetch(url,{...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}});
+  let active=false,button,status;
+  async function localAPI(path,opts={}){
+    const r=await fetch(path,{
+      ...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}
+    });
     const data=await r.json();
-    if(!r.ok)throw Error(data.error||'Local app error '+r.status);
+    if(!r.ok)throw Error(data.error||'Signal request failed: '+r.status);
     return data;
   }
-  function report(s){if(status)status.textContent=s}
-  async function remap({withReferences=true}={}){
+  function report(msg){if(status)status.textContent=msg}
+  async function remapAll(){
     if(active)return;
-    active=true;
-    if(button)button.disabled=true;
+    active=true;if(button)button.disabled=true;
     try{
-      report('Rechecking automatic mappings without changing manual edits…');
-      const local=await request('/api/auto-remap',{method:'POST',body:'{"suggestions":[]}'});
-      let total=local.changed||0, referenceMapped=0, last=local, note='';
-      if(withReferences){
-        report('Checking exact matches in the public exercise reference catalog…');
-        try{
-          const diag=await window.HevyMuscles.sync({useExerciseDB:false});
-          if(diag.wgerCount>0){
-            const metas=await request('/api/metadata');
-            const suggestions=[];
-            for(const m of Array.isArray(metas)?metas:[]){
-              if(!automatic(m)||!m.template_id||!m.exercise_title)continue;
-              const p=window.HevyMuscles.profile(m.exercise_title);
-              // A shared family name is not enough: protect custom technique variants.
-              if(p.source?.name!=='wger'||p.confidence!=='high'||!Array.isArray(p.primary)||!p.primary.length)continue;
-              if(p.matched?.trim().toLowerCase()!==m.exercise_title.trim().toLowerCase())continue;
-              suggestions.push({
-                template_id:m.template_id,exercise_title:m.exercise_title,matched:p.matched,
-                primary:p.primary,secondary:p.secondary,confidence:'high',source:'wger'
-              });
-            }
-            if(suggestions.length){
-              const res=await request('/api/auto-remap',{method:'POST',body:JSON.stringify({suggestions})});
-              total+=res.changed||0;
-              referenceMapped=res.referenceMapped||0;
-              last=res;
-            }
-            note=' · '+diag.wgerCount+' catalog records checked';
-          }else note=' · catalog unavailable; offline rules used';
-        }catch(e){note=' · catalog unavailable ('+String(e.message||e)+')';}
+      report('Downloading wger exercise database; manual and automatic labels will ALL be checked…');
+      const result=await window.HevyMuscles.sync({useExerciseDB:false});
+      const ready=result.wgerCount>0 && !/partial|unavailable|offline/i.test(result.status) && !result.error;
+      if(!ready)throw Error('Could not load a complete wger reference catalog: '+(result.error||result.status)+'. Existing classifications were not changed.');
+      const all=await localAPI('/api/all-exercises');
+      const exercises=Array.isArray(all)?all:[];
+      if(!exercises.length){
+        report('No exercises to remap. Sync Hevy or import your workouts first.');
+        return;
       }
-      report(total+' automatic classification(s) updated; '+last.manualPreserved+
-        ' manual mapping(s) protected; '+last.unmapped+' still unmapped'+
-        (referenceMapped?' · '+referenceMapped+' exact reference updates':'')+note+'.');
+      const suggestions=[];
+      let notMatched=0;
+      for(const ex of exercises){
+        if(!ex.template_id || !ex.exercise_title)continue;
+        const best=window.HevyMuscles.databaseProfile(ex.exercise_title);
+        if(!best || best.source.name!=='wger' || best.confidence!=='high'){
+          notMatched++;continue;
+        }
+        suggestions.push({
+          template_id:ex.template_id,
+          exercise_title:ex.exercise_title,
+          matched:best.matched,
+          source:'wger',
+          confidence:'high',
+          primary:best.primary,
+          secondary:best.secondary
+        });
+      }
+      if(!suggestions.length){
+        throw Error('No exercises matched wger reliably. Previous classifications were preserved for safety. Check exercise names and catalog coverage.');
+      }
+      report('Applying '+suggestions.length+' database matches, including replacements for manual maps…');
+      const res=await localAPI('/api/database-remap',{
+        method:'POST',body:JSON.stringify({catalog_loaded:true,suggestions})
+      });
+      report(res.matched+' / '+res.checked+' exercises matched to wger; '+
+        res.needsReview+' need verification and are excluded from muscle-volume totals. '+
+        res.changed+' classifications updated. No manual mapping was exempted.');
       if(typeof window.load==='function')await window.load();
     }catch(e){
-      report('Unable to remap: '+String(e.message||e));
-    }finally{active=false;if(button)button.disabled=false}
+      report('Database remapping incomplete: '+String(e.message||e));
+    }finally{
+      active=false;if(button)button.disabled=false;
+    }
   }
+  window.HevyMusclesRemapAll=remapAll;
   window.addEventListener('load',()=>{
     const editor=document.querySelector('#editor');
     if(!editor)return;
@@ -65,15 +70,15 @@
     wrap.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 0';
     button=document.createElement('button');
     button.type='button';
-    button.textContent='Re-map all automatic exercises';
+    button.textContent='Rebuild ALL muscle mappings from wger';
     status=document.createElement('span');
     status.setAttribute('role','status');
-    status.style.cssText='font-size:12px;color:#bac5d2;max-width:520px';
-    status.textContent='Keeps your manually entered muscles and all programming settings.';
+    status.style.cssText='font-size:12px;color:#bac5d2;max-width:610px';
+    status.textContent='Includes manual maps. Unmatched exercises stay flagged and do not contribute to modeled muscle totals.';
     wrap.append(button,status);
     editor.parentNode.insertBefore(wrap,editor);
-    button.addEventListener('click',()=>remap({withReferences:true}));
-    // Local rule updates also happen in the Go backend at startup; no online
-    // request is needed until the user explicitly asks to check the catalog.
+    button.addEventListener('click',remapAll);
+    // Initial import from old versions; after Hevy sync, app.js requests it again.
+    setTimeout(remapAll,1500);
   });
 })();
