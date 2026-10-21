@@ -4,23 +4,28 @@ Hevy Signal is a local training-analysis companion for Hevy. Hevy remains your w
 
 > Public beta. Independent project; not affiliated with or endorsed by Hevy.
 
-## Download — v3.6 Mac desktop
+## Download — v3.7 Mac desktop
 
-**[Hevy Signal v3.6 — Mac release](https://github.com/moriseren/hevy-signal/releases/tag/v3.6)**
+**[Hevy Signal v3.7 for Mac](https://github.com/moriseren/hevy-signal/releases/tag/v3.7)**
 
-- [Apple Silicon Mac (M1, M2, M3, M4 and newer)](https://github.com/moriseren/hevy-signal/releases/download/v3.6/Hevy-Signal-v3.6-macOS-Apple-Silicon.zip)
-- [Intel Mac](https://github.com/moriseren/hevy-signal/releases/download/v3.6/Hevy-Signal-v3.6-macOS-Intel.zip)
-- [Source archive and checksums](https://github.com/moriseren/hevy-signal/releases/tag/v3.6)
+- [Apple Silicon Mac (M1 and newer)](https://github.com/moriseren/hevy-signal/releases/download/v3.7/Hevy-Signal-v3.7-macOS-Apple-Silicon.zip)
+- [Intel Mac](https://github.com/moriseren/hevy-signal/releases/download/v3.7/Hevy-Signal-v3.7-macOS-Intel.zip)
+- [Full release, source and checksums](https://github.com/moriseren/hevy-signal/releases/tag/v3.7)
 
-### NEW: Choose your Hevy program folder
+### NEW: All exercise mappings are checked against wger
 
-Hevy Signal's **Current program** screen now includes **Active program folder**. Connect your Hevy Developer API key, click **Sync Hevy**, and choose your saved **Cut**, **Hypertrophy**, or another Hevy routine folder from the dropdown. Switching updates the active routines, exercise setup, progression signals, muscle-volume totals, and ChatGPT handoff brief. Choose **All saved routines** to return to the previous full-program view. The selection persists between launches; syncing never deletes other routines or workout history.
+v3.7 adds database-first automatic muscle classification throughout Hevy Signal, **including exercises you previously mapped manually**. Click **Rebuild ALL muscle mappings from wger** in the Exercise setup view to recheck every saved exercise from all Hevy folders. The app also requests the reference catalog after startup and after syncing Hevy. The prior manual map is not privileged: a confident wger exercise match replaces its primary/secondary muscles. The app preserves the non-anatomy fields (notes, program roles, rep targets and progression settings).
 
-When a folder is selected, Signal only uses workout sets explicitly tied by Hevy's \`routine_id\` to a routine in that folder. A workout not associated with a saved routine remains stored, but is excluded from that folder's strength comparisons and muscle-volume totals to avoid mixing programs. A Hevy **workout CSV does not contain saved routine folders**, so this feature requires an API-based Hevy sync.
+- **High-confidence match** — Shows wger as the source and the name of the matched exercise. Hevy names are checked against wger exercise titles and compatible equipment/variation labels; catalog data is not proof of individual muscle activation.
+- **Needs review / Unmapped** — No sufficiently reliable database match for this exercise variation. The app marks its muscle assignment unverified instead of inventing an anatomy classification, and excludes it from muscle-volume calculations.
+- **Database unavailable** — No destructive remapping occurs; previously saved mappings remain unchanged.
+- **Before first successful rebuild** — A full local data backup is written to `~/.hevy-signal/data-before-v3.7-database-remap.json`.
 
-The desktop source is now editable under [\`desktop/\`](https://github.com/moriseren/hevy-signal/tree/main/desktop) and is covered by program-isolation regression tests. Both Apple Silicon and Intel binaries compiled and all Go tests passed. The unsigned macOS beta may require Control-click → Open. Quit your previous version, unzip v3.6, and replace the existing Hevy Signal.app; your prior app data stays in \`~/.hevy-signal\`. Mac graphical testing remains pending.
+wger offers a public exercise catalog with primary/secondary muscle fields. Attribution: [wger](https://wger.de) ([project](https://github.com/wger-project/wger), exercise content available under item-specific Creative Commons licenses). The public catalog is downloaded through Signal's local Go backend to avoid browser CORS problems; **your workout log, Hevy API key and exercise title list are not sent to wger**. Only catalog page numbers are requested. Some uncommon custom movements may still require review because no single exercise database covers every variation. Supporting muscle entries reflect database anatomy, not validated fractional hypertrophy set credit.
 
-The earlier [v3.5 Mac release](https://github.com/moriseren/hevy-signal/releases/tag/v3.5) remains available.
+The v3.6 program folder selector is retained: choose **Cut**, **Hypertrophy**, or **All saved routines** to switch the active program. The database remap applies across all saved folders and does not mix their separately recorded performance histories.
+
+Quit your older copy, unzip the Mac download, and replace **Hevy Signal.app** in Applications. Your data remain in `~/.hevy-signal`. This beta is unsigned and macOS may require Control-click → Open at first launch. The Go and JavaScript regression suite and cross-architecture builds run in GitHub Actions; real Mac graphical/browser network behavior should still be checked after installation.
 
 ## iPhone / mobile web app
 
