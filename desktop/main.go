@@ -1870,6 +1870,36 @@ func (a *App) handler() http.Handler {
 	// all existing manual maps; source-matching happens in the browser against
 	// the public wger exercise catalog (the user's workout history never leaves
 	// the device for that lookup).
+	// Public catalog proxy avoids browser CORS restrictions. Only public
+	// pagination parameters are forwarded: never Hevy workout rows, keys,
+	// routine titles, or user-customized exercise names.
+	mux.HandleFunc("/api/reference/wger/exerciseinfo",func(w http.ResponseWriter,r *http.Request){
+		if r.Method!="GET" {writeJSON(w,405,map[string]any{"error":"GET required"});return}
+		limit:=100
+		offset:=0
+		if raw:=r.URL.Query().Get("limit");raw!="" {
+			n,e:=strconv.Atoi(raw);if e!=nil || n<1||n>100 {writeJSON(w,400,map[string]any{"error":"Invalid page limit"});return};limit=n
+		}
+		if raw:=r.URL.Query().Get("offset");raw!="" {
+			n,e:=strconv.Atoi(raw);if e!=nil || n<0||n>20000 {writeJSON(w,400,map[string]any{"error":"Invalid offset"});return};offset=n
+		}
+		remote:=fmt.Sprintf("https://wger.de/api/v2/exerciseinfo/?language=2&limit=%d&offset=%d",limit,offset)
+		req,err:=http.NewRequestWithContext(r.Context(),"GET",remote,nil)
+		if err!=nil {writeJSON(w,500,map[string]any{"error":err.Error()});return}
+		req.Header.Set("Accept","application/json")
+		req.Header.Set("User-Agent","Hevy-Signal/"+version)
+		client:=&http.Client{Timeout:20*time.Second}
+		res,err:=client.Do(req)
+		if err!=nil {writeJSON(w,502,map[string]any{"error":"wger catalog unavailable: "+err.Error()});return}
+		defer res.Body.Close()
+		if res.StatusCode!=200 {writeJSON(w,502,map[string]any{"error":fmt.Sprintf("wger returned HTTP %d",res.StatusCode)});return}
+		content,err:=io.ReadAll(io.LimitReader(res.Body,5<<20))
+		if err!=nil||!json.Valid(content) {writeJSON(w,502,map[string]any{"error":"Invalid wger response"});return}
+		w.Header().Set("Content-Type","application/json; charset=utf-8")
+		w.Header().Set("Cache-Control","no-store")
+		w.WriteHeader(200)
+		_,_=w.Write(content)
+	})
 	mux.HandleFunc("/api/all-exercises",func(w http.ResponseWriter,r *http.Request) {
 		if r.Method!="GET" {writeJSON(w,405,map[string]any{"error":"GET required"});return}
 		a.mu.RLock();defer a.mu.RUnlock()
