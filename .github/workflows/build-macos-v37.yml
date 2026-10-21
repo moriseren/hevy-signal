@@ -1,0 +1,98 @@
+name: Build Hevy Signal v3.7 for macOS
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/build-macos-v37.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hevy-desktop-v37
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.2'
+      - name: Test editable desktop source and program folders
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd desktop
+          gofmt -w main.go cmd/macos-launcher/main.go program_folders_test.go
+          node --check static/app.js
+          node --check static/auto-map.js
+          node --check static/muscle-engine.js
+          GO111MODULE=off CGO_ENABLED=0 go test -v main.go main_test.go remap_v34_test.go validation_v35_test.go program_folders_test.go database_remap_test.go
+          node database_engine.test.cjs
+          GO111MODULE=off CGO_ENABLED=0 go vet main.go main_test.go remap_v34_test.go validation_v35_test.go program_folders_test.go database_remap_test.go
+      - name: Build Apple Silicon and Intel Mac bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd desktop
+          for spec in arm64:Apple-Silicon amd64:Intel; do
+            ARCH="${spec%%:*}"
+            LABEL="${spec#*:}"
+            STAGING="$GITHUB_WORKSPACE/dist/$LABEL"
+            APP="$STAGING/Hevy Signal.app"
+            mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+            GO111MODULE=off CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" \
+              go build -trimpath -o "$APP/Contents/Resources/HevySignalBackend" main.go
+            GO111MODULE=off CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" \
+              go build -trimpath -o "$APP/Contents/MacOS/HevySignal" cmd/macos-launcher/main.go
+            chmod +x "$APP/Contents/MacOS/HevySignal" "$APP/Contents/Resources/HevySignalBackend"
+            cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>CFBundleName</key><string>Hevy Signal</string>
+          <key>CFBundleDisplayName</key><string>Hevy Signal</string>
+          <key>CFBundleIdentifier</key><string>app.hevysignal.local</string>
+          <key>CFBundleVersion</key><string>3.7</string>
+          <key>CFBundleShortVersionString</key><string>3.7</string>
+          <key>CFBundleExecutable</key><string>HevySignal</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>LSMinimumSystemVersion</key><string>11.0</string>
+          <key>LSUIElement</key><true/>
+          <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          PLIST
+            (cd "$STAGING" && zip -qry "$GITHUB_WORKSPACE/dist/Hevy-Signal-v3.7-macOS-$LABEL.zip" "Hevy Signal.app")
+            file "$APP/Contents/"{MacOS/HevySignal,Resources/HevySignalBackend}
+          done
+          cd "$GITHUB_WORKSPACE"
+          zip -qry "dist/Hevy-Signal-v3.7-source.zip" desktop
+          cd dist
+          sha256sum Hevy-Signal-v3.7-*.zip > Hevy-Signal-v3.7-SHA256.txt
+          cat Hevy-Signal-v3.7-SHA256.txt
+      - name: Upload Mac archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hevy-Signal-v3.7-macOS
+          path: |
+            dist/*.zip
+            dist/Hevy-Signal-v3.7-SHA256.txt
+          if-no-files-found: error
+      - name: Publish passing v3.7 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v3.7 >/dev/null 2>&1; then
+            echo "Release exists: refuse to overwrite."
+            exit 1
+          fi
+          gh release create v3.7 \
+            dist/Hevy-Signal-v3.7-macOS-Apple-Silicon.zip \
+            dist/Hevy-Signal-v3.7-macOS-Intel.zip \
+            dist/Hevy-Signal-v3.7-source.zip \
+            dist/Hevy-Signal-v3.7-SHA256.txt \
+            --title "Hevy Signal v3.7 — Database-First Muscle Anatomy Remapping" \
+            --notes "Hevy Signal v3.7: rebuild ALL primary and secondary muscle classifications using wger's public exercise database, including mappings previously entered manually; prior manual labels are no longer protected or privileged. Strict name and equipment checks avoid conflating distinct movement variations. Confidence/source appear in Exercise setup and ChatGPT handoff; exercises without reliable database matches are explicitly marked Unmapped/Needs review and excluded from muscle-volume totals. Creates a one-time backup at ~/.hevy-signal/data-before-v3.7-database-remap.json before first complete-catalog remap. Refresh automatically at startup and after Hevy sync, or use Rebuild ALL muscle mappings from wger. All programming settings and workout history remain saved. No workout data is sent to wger; a public exercise catalog is downloaded. If wger is unavailable, previous classifications are unchanged. Includes macOS Apple Silicon and Intel builds; Mac GUI testing is pending."
