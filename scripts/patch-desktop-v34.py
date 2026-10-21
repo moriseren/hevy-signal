@@ -73,7 +73,45 @@ api=r'''
   if err:=a.backupBeforeAutoRepair();err!=nil {
    writeJSON(w,500,map[string]any{"error":"Unable to back up mappings: "+err.Error()});return
   }
+  // Catalog suggestions must be exact-title, high-confidence wger references.
+  // The client never uploads the user's workout data to wger. The source lookup
+  // only retrieves a general public exercise catalog.
+  var request struct {
+   Suggestions []struct {
+    TemplateID string `json:"template_id"`
+    Title string `json:"exercise_title"`
+    Matched string `json:"matched"`
+    Source string `json:"source"`
+    Confidence string `json:"confidence"`
+    Primary []string `json:"primary"`
+    Secondary []string `json:"secondary"`
+   } `json:"suggestions"`
+  }
+  if err:=readJSON(r,&request);err!=nil {
+   writeJSON(w,400,map[string]any{"error":"Invalid mapping suggestions: "+err.Error()});return
+  }
   changed:=a.repairAutomaticMappings()
+  fromReference:=0
+  for index,proposal:=range request.Suggestions {
+   if index>=300 {break}
+   old,ok:=a.store.Meta[proposal.TemplateID]
+   if !ok || !isAutoEditable(old) || len(proposal.Primary)==0 || len(proposal.Primary)>8 || len(proposal.Secondary)>16 {continue}
+   if proposal.Source!="wger" || proposal.Confidence!="high" {continue}
+   if !strings.EqualFold(strings.TrimSpace(proposal.Title),strings.TrimSpace(old.ExerciseTitle)) {continue}
+   if !strings.EqualFold(strings.TrimSpace(proposal.Matched),strings.TrimSpace(old.ExerciseTitle)) {continue}
+   nextPrimary:=cleanMuscles(proposal.Primary)
+   nextSecondary:=cleanMuscles(proposal.Secondary)
+   if len(nextPrimary)==0 {continue}
+   // Exact catalog matches are allowed to revise any auto-generated profile;
+   // explicitly manual classifications are blocked above.
+   if strings.Join(old.MajorMuscles,"\x1f")==strings.Join(nextPrimary,"\x1f") && strings.Join(old.SupportingMuscles,"\x1f")==strings.Join(nextSecondary,"\x1f") {continue}
+   old.MajorMuscles=nextPrimary
+   old.SupportingMuscles=nextSecondary
+   old.AutoTagged=true
+   a.store.Meta[proposal.TemplateID]=normalizeMeta(old)
+   changed++
+   fromReference++
+  }
   manual:=0
   unknown:=0
   for _,m:=range a.store.Meta {
@@ -85,7 +123,7 @@ api=r'''
     writeJSON(w,500,map[string]any{"error":"Unable to save remapping: "+err.Error()});return
    }
   }
-  writeJSON(w,200,map[string]any{"ok":true,"changed":changed,"manualPreserved":manual,"unmapped":unknown})
+  writeJSON(w,200,map[string]any{"ok":true,"changed":changed,"referenceMapped":fromReference,"manualPreserved":manual,"unmapped":unknown})
  })
 '''
 anchor='\tmux.HandleFunc("/api/metadata",'
