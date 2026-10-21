@@ -1,0 +1,109 @@
+name: Build Hevy Signal v3.4 for macOS
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/patch-desktop-v34.py'
+      - 'scripts/remap-v34-tests.go'
+      - 'scripts/desktop-auto-map-v34.js'
+      - 'docs/muscle-engine.js'
+      - '.github/workflows/build-macos-v33.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: desktop-v34-release
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source updates
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.2'
+      - name: Recover official v3.2 desktop source and apply v3.4 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 3 -o /tmp/hevy-source.zip \
+            "https://github.com/moriseren/hevy-signal/releases/download/v3.2/Hevy-Signal-v3.2-source.zip"
+          printf '93077dbd213ba86a3bfeab46d3299439085eb2c4a3dbe8dcab109077c9127136  /tmp/hevy-source.zip\n' | sha256sum -c
+          unzip -q /tmp/hevy-source.zip -d "$RUNNER_TEMP"
+          SRC="$RUNNER_TEMP/Hevy-Signal-v3.2-source"
+          cp docs/muscle-engine.js "$SRC/static/muscle-engine.js"
+          cp scripts/desktop-auto-map-v34.js "$SRC/static/auto-map.js"
+          python3 scripts/patch-desktop-v33.py "$SRC"
+          python3 scripts/patch-desktop-v34.py "$SRC"
+          cp scripts/remap-v34-tests.go "$SRC/remap_v34_test.go"
+          gofmt -w "$SRC/main.go" "$SRC/cmd/macos-launcher/main.go"
+          echo "HEVY_SRC=$SRC" >> "$GITHUB_ENV"
+          node --check "$SRC/static/muscle-engine.js"
+          node --check "$SRC/static/auto-map.js"
+      - name: Test and cross-compile Mac binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$HEVY_SRC"
+          GO111MODULE=off CGO_ENABLED=0 go test -v main.go main_test.go remap_v34_test.go
+          for spec in arm64:Apple-Silicon amd64:Intel; do
+            ARCH="${spec%%:*}"
+            LABEL="${spec#*:}"
+            STAGING="$GITHUB_WORKSPACE/dist/$LABEL"
+            APP="$STAGING/Hevy Signal.app"
+            mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+            GO111MODULE=off CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" go build -trimpath \
+              -o "$APP/Contents/Resources/HevySignalBackend" main.go
+            GO111MODULE=off CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" go build -trimpath \
+              -o "$APP/Contents/MacOS/HevySignal" cmd/macos-launcher/main.go
+            chmod +x "$APP/Contents/MacOS/HevySignal" "$APP/Contents/Resources/HevySignalBackend"
+            cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>CFBundleName</key><string>Hevy Signal</string>
+          <key>CFBundleDisplayName</key><string>Hevy Signal</string>
+          <key>CFBundleIdentifier</key><string>app.hevysignal.local</string>
+          <key>CFBundleVersion</key><string>3.4</string>
+          <key>CFBundleShortVersionString</key><string>3.4</string>
+          <key>CFBundleExecutable</key><string>HevySignal</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>LSMinimumSystemVersion</key><string>11.0</string>
+          <key>LSUIElement</key><true/>
+          <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          PLIST
+            (cd "$STAGING" && zip -qry "$GITHUB_WORKSPACE/dist/Hevy-Signal-v3.4-macOS-$LABEL.zip" "Hevy Signal.app")
+            file "$APP/Contents/"{MacOS/HevySignal,Resources/HevySignalBackend}
+          done
+          (cd "$HEVY_SRC/.." && zip -qry "$GITHUB_WORKSPACE/dist/Hevy-Signal-v3.4-source.zip" "Hevy-Signal-v3.2-source")
+          cd "$GITHUB_WORKSPACE/dist"
+          sha256sum Hevy-Signal-v3.4-*.zip > Hevy-Signal-v3.4-SHA256.txt
+          cat Hevy-Signal-v3.4-SHA256.txt
+      - name: Upload verified builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hevy-Signal-v3.4-macOS
+          path: |
+            dist/*.zip
+            dist/Hevy-Signal-v3.4-SHA256.txt
+          if-no-files-found: error
+      - name: Publish macOS v3.4 release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view v3.4 >/dev/null 2>&1; then
+            echo "Release already exists; won't overwrite an existing version."
+            exit 1
+          fi
+          gh release create v3.4 \
+            dist/Hevy-Signal-v3.4-macOS-Apple-Silicon.zip \
+            dist/Hevy-Signal-v3.4-macOS-Intel.zip \
+            dist/Hevy-Signal-v3.4-source.zip \
+            dist/Hevy-Signal-v3.4-SHA256.txt \
+            --title "Hevy Signal v3.4 — Refresh All Automatic Muscle Classifications" \
+            --notes "Unsigned Mac beta builds for Apple Silicon and Intel. Repairs old unmapped exercises on launch without overwriting customized muscle assignments; includes new movement rules, in-app remapping controls and optional wger exercise reference matching. Hevy history and settings remain at ~/.hevy-signal. Technique-specific classifications are estimates and should be reviewed. Save a backup of your exercise mappings before upgrading. Built and Go-tested from the published v3.2 source and the repository's v3.4 patch."
