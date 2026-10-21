@@ -1,0 +1,28 @@
+name: Inspect desktop source archive
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/inspect-desktop.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download released source
+        shell: bash
+        run: |
+          curl -fLsS --retry 3 -o /tmp/source.zip "https://github.com/moriseren/hevy-signal/releases/download/v3.2/Hevy-Signal-v3.2-source.zip"
+          unzip -l /tmp/source.zip | head -65
+          mkdir -p /tmp/hevy-src
+          unzip -q /tmp/source.zip -d /tmp/hevy-src
+          echo '=== SOURCE FILES ==='
+          find /tmp/hevy-src -maxdepth 4 -type f | head -90
+          echo '=== GO MODULES / BUILD / MUSCLE CODE ==='
+          find /tmp/hevy-src -type f \( -name "*.go" -o -name "go.mod" -o -name "*.sh" \) | head -60
+          grep -RinE 'func .*muscle|Unmapped|MajorMuscles|major_muscles|SupportingMuscles|supporting_muscles|GOOS=darwin|go build' /tmp/hevy-src --include='*.go' --include='*.sh' --include='*.md' | head -85 || true
