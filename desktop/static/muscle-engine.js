@@ -62,9 +62,9 @@
     if(/biceps femoris|semitendinosus|semimembranosus|hamstrings/.test(n))return 'Hamstrings';
     if(/latissimus/.test(n))return 'Lats';
     if(/rhomboid|middle trapezius/.test(n))return 'Mid traps/rhomboids';
-    if(/deltoid.*(middle|lateral)|lateral deltoid/.test(n))return 'Side delts';
-    if(/deltoid.*(rear|posterior)/.test(n))return 'Rear delts';
-    if(/deltoid.*(front|anterior)/.test(n))return 'Front delts';
+    if(/(?:deltoid.*(?:middle|lateral)|(?:middle|lateral) deltoid)/.test(n))return 'Side delts';
+    if(/(?:deltoid.*(?:rear|posterior)|(?:rear|posterior) deltoid)/.test(n))return 'Rear delts';
+    if(/(?:deltoid.*(?:front|anterior)|(?:front|anterior) deltoid)/.test(n))return 'Front delts';
     if(/pectoralis/.test(n))return 'Chest';
     if(/gastrocnemius|soleus/.test(n))return 'Calves';
     if(/triceps brachii/.test(n))return 'Triceps';
