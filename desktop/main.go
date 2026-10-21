@@ -28,7 +28,7 @@ import (
 var staticFS embed.FS
 
 const baseURL = "https://api.hevyapp.com/v1"
-const version = "3.5-volume-validation"
+const version = "3.6-folder-programs"
 
 type Config struct {
 	HevyAPIKey string `json:"hevy_api_key"`
@@ -39,6 +39,7 @@ type SetRow struct {
 	WorkoutTitle  string  `json:"workout_title"`
 	PerformedAt   string  `json:"performed_at"`
 	TemplateID    string  `json:"template_id"`
+	RoutineID     string  `json:"routine_id,omitempty"`
 	ExerciseTitle string  `json:"exercise_title"`
 	SetIndex      int     `json:"set_index"`
 	WeightKg      float64 `json:"weight_kg"`
@@ -76,6 +77,11 @@ type RoutineExercise struct {
 	RepTargets    string `json:"rep_targets"`
 }
 
+type RoutineFolder struct {
+ ID string `json:"id"`
+ Title string `json:"title"`
+}
+
 type RoutineSummary struct {
 	ID        string            `json:"id"`
 	Title     string            `json:"title"`
@@ -90,6 +96,8 @@ type Store struct {
 	Meta                    map[string]Meta   `json:"meta"`
 	Routines                []RoutineSummary  `json:"routines"`
 	CurrentRoutineExercises map[string]bool   `json:"current_routine_exercises"`
+ ActiveFolderID string `json:"active_folder_id,omitempty"`
+ RoutineFolders []RoutineFolder `json:"routine_folders,omitempty"`
 }
 
 type App struct {
@@ -248,6 +256,7 @@ func newApp() *App {
 	_ = os.MkdirAll(dir, 0700)
 	a := &App{dir: dir, cfg: Config{}, store: Store{WorkoutIDs: map[string]string{}, Meta: map[string]Meta{}, CurrentRoutineExercises: map[string]bool{}}}
 	a.load()
+	if a.store.ProgramSource=="hevy-api" && a.store.ActiveFolderID!="" { a.rebuildCurrentRoutineExercisesLocked() }
 	if err := a.backupBeforeAutoRepair(); err != nil {
 		log.Printf("auto-mapping backup failed: %v", err)
 	} else if a.repairAutomaticMappings() > 0 {
@@ -442,9 +451,69 @@ func routineRepTargets(sets []any) string {
 	return strings.Join(parts, "/")
 }
 
+// The complete saved routine library stays in Store.Routines. The active program
+// is a view controlled by the user's explicitly selected Hevy folder.
+func (a *App) selectedRoutinesLocked() []RoutineSummary {
+ if a.store.ActiveFolderID=="" || a.store.ProgramSource=="csv-inferred" {return a.store.Routines}
+ out:=[]RoutineSummary{}
+ for _,r:=range a.store.Routines {if r.FolderID==a.store.ActiveFolderID{out=append(out,r)}}
+ return out
+}
+func (a *App) selectedFolderTitleLocked() string {
+ if a.store.ActiveFolderID=="" || a.store.ProgramSource=="csv-inferred" {return "All saved routines"}
+ for _,f:=range a.store.RoutineFolders {if f.ID==a.store.ActiveFolderID {return f.Title}}
+ return "Previously selected folder is unavailable (choose another)"
+}
+func (a *App) rebuildCurrentRoutineExercisesLocked() {
+ active:=map[string]bool{}
+ for _,r:=range a.selectedRoutinesLocked() {
+  for _,ex:=range r.Exercises {if ex.TemplateID!="" {active[ex.TemplateID]=true}}
+ }
+ a.store.CurrentRoutineExercises=active
+}
+// When a specific folder is selected, the workout must reference a routine in
+// that folder. Missing routine IDs are excluded, never silently misattributed.
+func (a *App) isSelectedWorkoutSetLocked(row SetRow) bool {
+ if a.store.ActiveFolderID=="" || a.store.ProgramSource=="csv-inferred" {return true}
+ if row.RoutineID=="" {return false}
+ for _,r:=range a.selectedRoutinesLocked() {if r.ID==row.RoutineID {return true}}
+ return false
+}
+func parseHevyFolders(j map[string]any) []RoutineFolder {
+ arr,_:=j["routine_folders"].([]any)
+ if arr==nil {arr,_=j["data"].([]any)}
+ out:=[]RoutineFolder{}
+ seen:=map[string]bool{}
+ for _,v:=range arr {
+  row,ok:=v.(map[string]any);if !ok {continue}
+  id:=strings.TrimSpace(asString(mget(row,"id","folder_id")))
+  if id==""||seen[id] {continue}
+  title:=strings.TrimSpace(asString(mget(row,"title","name")))
+  if title=="" {title="Untitled folder"}
+  seen[id]=true
+  out=append(out,RoutineFolder{ID:id,Title:title})
+ }
+ return out
+}
+func (a *App) fetchRoutineFolders() ([]RoutineFolder,error) {
+ folders:=[]RoutineFolder{}
+ seen:=map[string]bool{}
+ for page:=1;page<=100;page++ {
+  q:=url.Values{};q.Set("page",strconv.Itoa(page));q.Set("pageSize","10")
+  j,err:=a.hevyGet("/routine_folders?"+q.Encode())
+  if err!=nil {return nil,err}
+  pageFolders:=parseHevyFolders(j)
+  for _,f:=range pageFolders {if !seen[f.ID] {seen[f.ID]=true;folders=append(folders,f)}}
+  if count,ok:=asInt(mget(j,"page_count","pageCount"));ok {
+   if page>=count {break}
+  }else if len(pageFolders)<10 {break}
+  if len(pageFolders)==0 {break}
+ }
+ return folders,nil
+}
+
 func (a *App) syncRoutines() (int, error) {
 	routines := []RoutineSummary{}
-	active := map[string]bool{}
 	for page := 1; page <= 100; page++ {
 		q := url.Values{}
 		q.Set("page", strconv.Itoa(page))
@@ -494,7 +563,6 @@ func (a *App) syncRoutines() (int, error) {
 				}
 				re := RoutineExercise{TemplateID: tid, ExerciseTitle: et, SetCount: count, RepTargets: routineRepTargets(sets)}
 				r.Exercises = append(r.Exercises, re)
-				active[tid] = true
 			}
 			routines = append(routines, r)
 		}
@@ -508,6 +576,8 @@ func (a *App) syncRoutines() (int, error) {
 			break
 		}
 	}
+	folders, err := a.fetchRoutineFolders()
+	if err != nil {return 0,fmt.Errorf("Hevy routine folders could not be loaded: %w",err)}
 	a.mu.Lock()
 	for _, r := range routines {
 		for _, ex := range r.Exercises {
@@ -522,10 +592,12 @@ func (a *App) syncRoutines() (int, error) {
 		}
 	}
 	a.store.Routines = routines
-	a.store.CurrentRoutineExercises = active
+	a.store.RoutineFolders = folders
 	a.store.ProgramSource = "hevy-api"
+	a.rebuildCurrentRoutineExercisesLocked()
+	activeCount:=len(a.selectedRoutinesLocked())
 	a.mu.Unlock()
-	return len(routines), nil
+	return activeCount, nil
 }
 
 func (a *App) syncHevy() (int, int, error) {
@@ -744,6 +816,8 @@ func (a *App) importHevyCSV(r io.Reader) (int, int, int, error) {
 	a.store.CurrentRoutineExercises = map[string]bool{}
 	a.store.Meta = map[string]Meta{}
 	a.store.ProgramSource = "csv-inferred"
+	a.store.ActiveFolderID=""
+	a.store.RoutineFolders=nil
 	for _, cw := range workouts {
 		a.store.WorkoutIDs[cw.ID] = cw.Title
 		for _, sr := range cw.Rows {
@@ -940,7 +1014,7 @@ func (a *App) ingestLocked(w map[string]any) {
 			if st == "warmup" || st == "warm_up" {
 				continue
 			}
-			row := SetRow{WorkoutID: wid, WorkoutTitle: title, PerformedAt: at, TemplateID: tid, ExerciseTitle: et}
+			row := SetRow{WorkoutID: wid, WorkoutTitle: title, PerformedAt: at, TemplateID: tid, RoutineID: asString(mget(w,"routine_id","routineId")), ExerciseTitle: et}
 			if x, ok := asInt(s["index"]); ok {
 				row.SetIndex = x
 			}
@@ -1012,7 +1086,7 @@ func summary(rows []SetRow) SessionSummary {
 func (a *App) sessionsFor(tid string, limit int) [][]SetRow {
 	rows := []SetRow{}
 	for _, s := range a.store.Sets {
-		if s.TemplateID == tid {
+		if s.TemplateID == tid && a.isSelectedWorkoutSetLocked(s) {
 			rows = append(rows, s)
 		}
 	}
@@ -1374,6 +1448,7 @@ func (a *App) currentRoutineStimulus(days int) ([]map[string]any, map[string]map
 	mus := map[string]float64{}
 	stim := map[string]map[string]float64{}
 	for _, r := range a.store.Sets {
+		if !a.isSelectedWorkoutSetLocked(r) {continue}
 		if !a.store.CurrentRoutineExercises[r.TemplateID] {
 			continue
 		}
@@ -1574,7 +1649,9 @@ func (a *App) chatGPTBrief() string {
 		b.WriteString("## Instructions for ChatGPT\n\nUse this brief as the source of truth for my current training program and recent Hevy performance. Saved Hevy routines define the active program; historical exercises outside them are context only. Do not invent sets, loads, reps, RPE, recovery, body composition, or technique details not present here. Distinguish programmed routine volume from completed recent volume. Treat materially different execution variants as separate lifts. One poor exposure alone is not a reason to rewrite the program. Give conversational coaching analysis rather than repeating Signal status labels.\n\n")
 		b.WriteString("## Current Hevy routines\n\n")
 	}
-	for _, r := range a.store.Routines {
+	fmt.Fprintf(&b,"**Active Hevy program:** %s\n\n",a.selectedFolderTitleLocked())
+	if a.store.ActiveFolderID!="" { b.WriteString("Only workouts explicitly linked to routines in this folder count in the selected-program strength and volume totals. Older sets without routine IDs stay saved but are excluded from this program\u0027s calculations.\n\n") }
+	for _, r := range a.selectedRoutinesLocked() {
 		fmt.Fprintf(&b, "### %s\n", r.Title)
 		for _, x := range r.Exercises {
 			extra := ""
@@ -1739,12 +1816,42 @@ func (a *App) handler() http.Handler {
 				unmapped++
 			}
 		}
-		writeJSON(w, 200, map[string]any{"recs": recs, "routines": a.store.Routines, "counts": map[string]any{"workouts": len(a.store.WorkoutIDs), "sets": len(a.store.Sets), "unmapped": unmapped, "routines": len(a.store.Routines), "routineExercises": len(a.store.CurrentRoutineExercises)}, "muscle": mus, "stimulus": stim, "hevyConfigured": strings.TrimSpace(a.cfg.HevyAPIKey) != "", "programSource": a.store.ProgramSource})
+		writeJSON(w, 200, map[string]any{"recs": recs, "routines": a.selectedRoutinesLocked(), "activeFolderId":a.store.ActiveFolderID,"activeFolderName":a.selectedFolderTitleLocked(), "counts": map[string]any{"workouts": len(a.store.WorkoutIDs), "sets": len(a.store.Sets), "unmapped": unmapped, "routines": len(a.selectedRoutinesLocked()), "routineExercises": len(a.store.CurrentRoutineExercises)}, "muscle": mus, "stimulus": stim, "hevyConfigured": strings.TrimSpace(a.cfg.HevyAPIKey) != "", "programSource": a.store.ProgramSource})
 	})
+	mux.HandleFunc("/api/program-folders",func(w http.ResponseWriter,r *http.Request){
+  if r.Method!="GET" {writeJSON(w,405,map[string]any{"error":"GET required"});return}
+  a.mu.RLock();defer a.mu.RUnlock()
+  writeJSON(w,200,map[string]any{"folders":a.store.RoutineFolders,
+    "activeFolderId":a.store.ActiveFolderID,"activeFolderName":a.selectedFolderTitleLocked(),
+    "currentRoutines":len(a.selectedRoutinesLocked()),"programSource":a.store.ProgramSource,
+    "hevyConfigured":strings.TrimSpace(a.cfg.HevyAPIKey)!=""})
+ })
+ mux.HandleFunc("/api/select-program-folder",func(w http.ResponseWriter,r *http.Request){
+  if r.Method!="POST" {writeJSON(w,405,map[string]any{"error":"POST required"});return}
+  var body struct{FolderID string `json:"folder_id"`}
+  if err:=readJSON(r,&body);err!=nil {writeJSON(w,400,map[string]any{"error":err.Error()});return}
+  a.mu.Lock();defer a.mu.Unlock()
+  if a.store.ProgramSource!="hevy-api" {writeJSON(w,409,map[string]any{"error":"Program folder selection requires Hevy API sync. Workout CSV exports do not contain saved folders."});return}
+  id:=strings.TrimSpace(body.FolderID)
+  if id!="" {
+   valid:=false
+   for _,f:=range a.store.RoutineFolders {if f.ID==id {valid=true;break}}
+   if !valid {writeJSON(w,404,map[string]any{"error":"Folder not available. Sync Hevy to refresh its folder list."});return}
+  }
+  oldID,oldExercises:=a.store.ActiveFolderID,a.store.CurrentRoutineExercises
+  a.store.ActiveFolderID=id
+  a.rebuildCurrentRoutineExercisesLocked()
+  if err:=a.saveStore();err!=nil {
+   a.store.ActiveFolderID=oldID;a.store.CurrentRoutineExercises=oldExercises
+   writeJSON(w,500,map[string]any{"error":"Could not persist program folder: "+err.Error()});return
+  }
+  writeJSON(w,200,map[string]any{"ok":true,"activeFolderId":id,"activeFolderName":a.selectedFolderTitleLocked(),"currentRoutines":len(a.selectedRoutinesLocked())})
+ })
+
 	mux.HandleFunc("/api/routines", func(w http.ResponseWriter, r *http.Request) {
 		a.mu.RLock()
 		defer a.mu.RUnlock()
-		writeJSON(w, 200, a.store.Routines)
+		writeJSON(w, 200, a.selectedRoutinesLocked())
 	})
 
 	mux.HandleFunc("/api/auto-remap", func(w http.ResponseWriter, r *http.Request) {
