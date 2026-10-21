@@ -1,0 +1,97 @@
+name: Build Hevy Signal v3.6 for macOS
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/build-macos-v36.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hevy-desktop-v36
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.2'
+      - name: Test editable desktop source and program folders
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd desktop
+          gofmt -w main.go cmd/macos-launcher/main.go program_folders_test.go
+          node --check static/app.js
+          node --check static/auto-map.js
+          node --check static/muscle-engine.js
+          GO111MODULE=off CGO_ENABLED=0 go test -v main.go main_test.go remap_v34_test.go validation_v35_test.go program_folders_test.go
+          GO111MODULE=off CGO_ENABLED=0 go vet main.go main_test.go remap_v34_test.go validation_v35_test.go program_folders_test.go
+      - name: Build Apple Silicon and Intel Mac bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd desktop
+          for spec in arm64:Apple-Silicon amd64:Intel; do
+            ARCH="${spec%%:*}"
+            LABEL="${spec#*:}"
+            STAGING="$GITHUB_WORKSPACE/dist/$LABEL"
+            APP="$STAGING/Hevy Signal.app"
+            mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+            GO111MODULE=off CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" \
+              go build -trimpath -o "$APP/Contents/Resources/HevySignalBackend" main.go
+            GO111MODULE=off CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" \
+              go build -trimpath -o "$APP/Contents/MacOS/HevySignal" cmd/macos-launcher/main.go
+            chmod +x "$APP/Contents/MacOS/HevySignal" "$APP/Contents/Resources/HevySignalBackend"
+            cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>CFBundleName</key><string>Hevy Signal</string>
+          <key>CFBundleDisplayName</key><string>Hevy Signal</string>
+          <key>CFBundleIdentifier</key><string>app.hevysignal.local</string>
+          <key>CFBundleVersion</key><string>3.6</string>
+          <key>CFBundleShortVersionString</key><string>3.6</string>
+          <key>CFBundleExecutable</key><string>HevySignal</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>LSMinimumSystemVersion</key><string>11.0</string>
+          <key>LSUIElement</key><true/>
+          <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          PLIST
+            (cd "$STAGING" && zip -qry "$GITHUB_WORKSPACE/dist/Hevy-Signal-v3.6-macOS-$LABEL.zip" "Hevy Signal.app")
+            file "$APP/Contents/"{MacOS/HevySignal,Resources/HevySignalBackend}
+          done
+          cd "$GITHUB_WORKSPACE"
+          zip -qry "dist/Hevy-Signal-v3.6-source.zip" desktop
+          cd dist
+          sha256sum Hevy-Signal-v3.6-*.zip > Hevy-Signal-v3.6-SHA256.txt
+          cat Hevy-Signal-v3.6-SHA256.txt
+      - name: Upload Mac archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hevy-Signal-v3.6-macOS
+          path: |
+            dist/*.zip
+            dist/Hevy-Signal-v3.6-SHA256.txt
+          if-no-files-found: error
+      - name: Publish passing v3.6 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v3.6 >/dev/null 2>&1; then
+            echo "Release exists: refuse to overwrite."
+            exit 1
+          fi
+          gh release create v3.6 \
+            dist/Hevy-Signal-v3.6-macOS-Apple-Silicon.zip \
+            dist/Hevy-Signal-v3.6-macOS-Intel.zip \
+            dist/Hevy-Signal-v3.6-source.zip \
+            dist/Hevy-Signal-v3.6-SHA256.txt \
+            --title "Hevy Signal v3.6 — Select Hevy Program Folder" \
+            --notes "Choose a saved Hevy Cut, Hypertrophy, or other folder as the active program. Uses Hevy API routine_folders and routine folder_id, stores selection locally, and scopes current routines, exercise setups, Signal recommendations and ChatGPT handoff to the selected folder. Keeps all routine folders and historical workouts saved and instantly switchable. When a folder is selected, prior sets are included in strength/volume comparison only when Hevy links the workout to a routine in that folder; workouts missing routine_id are excluded instead of guessed. CSV exports do not contain saved routine folders; this requires Hevy API sync. Both Mac architectures and Go regression tests passed; unsigned beta requires Control-click and Open if macOS prompts."
