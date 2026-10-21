@@ -28,7 +28,7 @@ import (
 var staticFS embed.FS
 
 const baseURL = "https://api.hevyapp.com/v1"
-const version = "3.6-folder-programs"
+const version = "3.7-database-muscles"
 
 type Config struct {
 	HevyAPIKey string `json:"hevy_api_key"`
@@ -68,6 +68,10 @@ type Meta struct {
 	IncrementKg      float64  `json:"increment_kg"`
 	Notes            string   `json:"notes"`
 	AutoTagged       bool     `json:"auto_tagged"`
+	AnatomySource string `json:"anatomy_source,omitempty"`
+	AnatomyConfidence string `json:"anatomy_confidence,omitempty"`
+	AnatomyMatched string `json:"anatomy_matched,omitempty"`
+	AnatomyNeedsReview bool `json:"anatomy_needs_review,omitempty"`
 }
 
 type RoutineExercise struct {
@@ -894,6 +898,7 @@ func (a *App) importHevyCSV(r io.Reader) (int, int, int, error) {
 // v3.3's browser catalog accidentally marked machine-generated classifications
 // as manual, recognizable by its distinctive Movement marker.
 func isAutoEditable(m Meta) bool {
+	if m.AnatomySource=="wger" || m.AnatomyNeedsReview {return false}
 	unknown := len(m.MajorMuscles) == 0 ||
 		(len(m.MajorMuscles) == 1 && strings.EqualFold(strings.TrimSpace(m.MajorMuscles[0]), "Unmapped"))
 	defaultUnknown := unknown && (m.Movement == "" || m.Movement == "Unmapped")
@@ -1251,6 +1256,7 @@ func sanitizeAutomaticPress(title string, major, secondary []string) ([]string, 
 // secondary muscle exposure is modeled at 0.5, never added to an already
 // directly trained canonical group for that same exercise set.
 func addMuscleExposure(m Meta, mus map[string]float64, stim map[string]map[string]float64) {
+	if m.AnatomyNeedsReview {return} // no unverified anatomy in volume totals
 	if isNonRepTitle(m.ExerciseTitle) {
 		return
 	} // carries/cardio use separate training metrics
@@ -1328,6 +1334,10 @@ func (a *App) recFor(m Meta) Rec {
 		return x
 	}
 
+	if m.AnatomyNeedsReview {
+		return set("review","Anatomy reference match needed",
+			"No confident database exercise match was found for this exact variation. It is excluded from muscle-volume totals until verified. Recheck after adjusting the Hevy exercise title or equipment variant.",.95)
+	}
 	if isWalkingTitle(m.ExerciseTitle) {
 		return set("tracking", "Track walking by time and pace", "Use duration, distance, pace, and perceived effort for walking. Hevy's rep-based entries cannot establish walking progression; no load/reps or e1RM recommendation is issued.", .9)
 	}
@@ -1676,6 +1686,7 @@ func (a *App) chatGPTBrief() string {
 		if strings.TrimSpace(m.Notes) != "" {
 			fmt.Fprintf(&b, "- Notes: %s\n", m.Notes)
 		}
+		fmt.Fprintf(&b,"- Anatomy source: %s · match: %s · catalog exercise: %s · requires review: %t\\n",m.AnatomySource,m.AnatomyConfidence,m.AnatomyMatched,m.AnatomyNeedsReview)
 		fmt.Fprintf(&b, "- Signal: %s — %s\n- Rationale: %s\n", r.Status, r.Headline, r.Rationale)
 		groups := a.sessionsFor(m.TemplateID, 4)
 		if len(groups) == 0 {
@@ -1854,6 +1865,93 @@ func (a *App) handler() http.Handler {
 		writeJSON(w, 200, a.selectedRoutinesLocked())
 	})
 
+
+	// Bulk rebuild must include every exercise in every Hevy program folder and
+	// all existing manual maps; source-matching happens in the browser against
+	// the public wger exercise catalog (the user's workout history never leaves
+	// the device for that lookup).
+	mux.HandleFunc("/api/all-exercises",func(w http.ResponseWriter,r *http.Request) {
+		if r.Method!="GET" {writeJSON(w,405,map[string]any{"error":"GET required"});return}
+		a.mu.RLock();defer a.mu.RUnlock()
+		writeJSON(w,200,a.metadata())
+	})
+	mux.HandleFunc("/api/database-remap",func(w http.ResponseWriter,r *http.Request) {
+		if r.Method!="POST" {writeJSON(w,405,map[string]any{"error":"POST required"});return}
+		var req struct {
+			CatalogLoaded bool `json:"catalog_loaded"`
+			Suggestions []struct {
+				TemplateID string `json:"template_id"`
+				ExerciseTitle string `json:"exercise_title"`
+				Matched string `json:"matched"`
+				Source string `json:"source"`
+				Confidence string `json:"confidence"`
+				Primary []string `json:"primary"`
+				Secondary []string `json:"secondary"`
+			} `json:"suggestions"`
+		}
+		if err:=readJSON(r,&req);err!=nil {writeJSON(w,400,map[string]any{"error":err.Error()});return}
+		if !req.CatalogLoaded {writeJSON(w,409,map[string]any{"error":"wger catalog is unavailable; no existing mappings were changed."});return}
+		a.mu.Lock();defer a.mu.Unlock()
+		backup:=filepath.Join(a.dir,"data-before-v3.7-database-remap.json")
+		if _,err:=os.Stat(backup);os.IsNotExist(err) {
+			raw,err:=os.ReadFile(filepath.Join(a.dir,"data.json"))
+			if err!=nil&&!os.IsNotExist(err){writeJSON(w,500,map[string]any{"error":"Could not read data backup: "+err.Error()});return}
+			if len(raw)>0 {if err=os.WriteFile(backup,raw,0600);err!=nil {writeJSON(w,500,map[string]any{"error":"Could not back up prior mappings: "+err.Error()});return}}
+		} else if err!=nil {writeJSON(w,500,map[string]any{"error":"Cannot check backup: "+err.Error()});return}
+		suggested:=map[string]Meta{}
+		for _,x:=range req.Suggestions {
+			old,ok:=a.store.Meta[x.TemplateID]
+			if !ok||x.Source!="wger"||x.Confidence!="high"||len(x.Primary)==0||len(x.Primary)>12||len(x.Secondary)>20 {continue}
+			if !strings.EqualFold(strings.TrimSpace(old.ExerciseTitle),strings.TrimSpace(x.ExerciseTitle)) {continue}
+			if strings.TrimSpace(x.Matched)=="" {continue}
+			// Source matched title may differ from Hevy title by normalized
+			// equipment terms; client enforces variation and ambiguity checks.
+			m:=old
+			m.MajorMuscles=cleanMuscles(x.Primary)
+			m.SupportingMuscles=cleanMuscles(x.Secondary)
+			beforeMajor:=strings.Join(m.MajorMuscles,"|")
+			beforeSecondary:=strings.Join(m.SupportingMuscles,"|")
+			m.MajorMuscles,m.SupportingMuscles=sanitizeAutomaticPress(old.ExerciseTitle,m.MajorMuscles,m.SupportingMuscles)
+			if len(m.MajorMuscles)==0 {continue}
+			m.AnatomySource="wger"
+			if strings.Join(m.MajorMuscles,"|")!=beforeMajor||strings.Join(m.SupportingMuscles,"|")!=beforeSecondary {m.AnatomySource="wger + biomechanical normalization"}
+			m.AnatomyConfidence="high"
+			m.AnatomyMatched=x.Matched
+			m.AnatomyNeedsReview=false
+			m.AutoTagged=true
+			suggested[x.TemplateID]=normalizeMeta(m)
+		}
+		changed,matched,needsReview:=0,0,0
+		for tid,old:=range a.store.Meta {
+			if update,ok:=suggested[tid];ok {
+				matched++
+				if strings.Join(old.MajorMuscles,"|")!=strings.Join(update.MajorMuscles,"|")||
+					strings.Join(old.SupportingMuscles,"|")!=strings.Join(update.SupportingMuscles,"|")||
+					old.AnatomySource!=update.AnatomySource||old.AnatomyNeedsReview {
+					a.store.Meta[tid]=update
+					changed++
+				}
+				continue
+			}
+			needsReview++
+			if !old.AnatomyNeedsReview || old.AnatomySource!="wger: no reliable match"||
+				len(old.MajorMuscles)!=1 || old.MajorMuscles[0]!="Unmapped" {
+				old.MajorMuscles=[]string{"Unmapped"}
+				old.SupportingMuscles=[]string{}
+				old.AnatomySource="wger: no reliable match"
+				old.AnatomyConfidence="unmapped"
+				old.AnatomyMatched=""
+				old.AnatomyNeedsReview=true
+				old.AutoTagged=true
+				a.store.Meta[tid]=normalizeMeta(old)
+				changed++
+			}
+		}
+		if changed>0 {if err:=a.saveStore();err!=nil {writeJSON(w,500,map[string]any{"error":"Could not save database mappings: "+err.Error()});return}}
+		writeJSON(w,200,map[string]any{"ok":true,"checked":len(a.store.Meta),"matched":matched,
+			"needsReview":needsReview,"changed":changed,"source":"wger","allPreviousMappingsRechecked":true})
+	})
+
 	mux.HandleFunc("/api/auto-remap", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			writeJSON(w, 405, map[string]any{"error": "POST required"})
@@ -1961,6 +2059,9 @@ func (a *App) handler() http.Handler {
 		}
 		m.ExerciseTitle = old.ExerciseTitle
 		m.AutoTagged = false
+		m.AnatomySource="user-entered (not verified by wger)"
+		m.AnatomyConfidence="manual"
+		m.AnatomyNeedsReview=false
 		a.store.Meta[m.TemplateID] = m
 		err := a.saveStore()
 		a.mu.Unlock()
