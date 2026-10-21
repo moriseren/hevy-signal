@@ -4,18 +4,19 @@ Hevy Signal is a local training-analysis companion for Hevy. Hevy remains your w
 
 > Public beta. Independent project; not affiliated with or endorsed by Hevy.
 
-## Download
+## Download — v3.3 Mac desktop
 
-**[Download the latest Hevy Signal release](https://github.com/moriseren/hevy-signal/releases/latest)**
+**[Download Hevy Signal v3.3](https://github.com/moriseren/hevy-signal/releases/tag/v3.3)** (released October 20, 2026 EDT).
 
-For v3.2, release assets should be:
+- **Apple Silicon (M1/M2/M3/M4 and newer):** [Hevy-Signal-v3.3-macOS-Apple-Silicon.zip](https://github.com/moriseren/hevy-signal/releases/download/v3.3/Hevy-Signal-v3.3-macOS-Apple-Silicon.zip)
+- **Intel Macs:** [Hevy-Signal-v3.3-macOS-Intel.zip](https://github.com/moriseren/hevy-signal/releases/download/v3.3/Hevy-Signal-v3.3-macOS-Intel.zip)
+- [v3.3 source and checksums](https://github.com/moriseren/hevy-signal/releases/tag/v3.3)
 
-- **Windows** — `Hevy-Signal-v3.2-Windows-all.zip` contains x64 (Intel/AMD) and ARM64 builds.
-- **Mac Apple Silicon** — `Hevy-Signal-v3.2-macOS-Apple-Silicon.zip` for M1, M2, M3, M4, and newer Apple Silicon Macs.
+v3.3 expands movement coverage and automatically repairs saved **Unmapped** classifications at startup, without changing your manually assigned muscles. It also adds an **Auto-map unresolved exercises** control in Exercise setup and optionally uses the wger exercise catalog as a supplemental source. Those automated assignments are estimates and can need review for technique-specific variants.
 
-You do **not** need Google Drive, Python, Node, Xcode, or an OpenAI API key. Builds are hosted directly by GitHub Releases.
+To upgrade, quit the old Hevy Signal, back up exercise mappings from **Privacy & data**, unzip the appropriate Mac download, and replace the old application in Applications with the new **Hevy Signal.app**. Your synced training data stays under `~/.hevy-signal`. Since these are unsigned beta builds, you may need Control-click → **Open** when launching them for the first time. The Mac UI could not be executed on the Linux build runner; Go tests and cross-compilation passed.
 
-Because the public beta is not code-signed yet, Windows SmartScreen or macOS Gatekeeper may show an unknown-developer warning. Only bypass that warning for a copy downloaded from this repository's official Releases page.
+The v3.2 Windows release remains available from [older releases](https://github.com/moriseren/hevy-signal/releases/tag/v3.2). The v3.3 release updates **Mac desktop** only.
 
 ## iPhone / mobile web app
 
