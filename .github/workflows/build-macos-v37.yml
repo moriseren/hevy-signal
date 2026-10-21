@@ -86,8 +86,13 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view v3.7 >/dev/null 2>&1; then
-            echo "Release exists: refuse to overwrite."
-            exit 1
+            echo "Replacing older v3.7 assets with final passing build."
+            gh release upload v3.7 --clobber \
+              dist/Hevy-Signal-v3.7-macOS-Apple-Silicon.zip \
+              dist/Hevy-Signal-v3.7-macOS-Intel.zip \
+              dist/Hevy-Signal-v3.7-source.zip \
+              dist/Hevy-Signal-v3.7-SHA256.txt
+            exit 0
           fi
           gh release create v3.7 \
             dist/Hevy-Signal-v3.7-macOS-Apple-Silicon.zip \
