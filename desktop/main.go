@@ -1939,6 +1939,8 @@ func (a *App) handler() http.Handler {
 			m:=old
 			m.MajorMuscles=cleanMuscles(x.Primary)
 			m.SupportingMuscles=cleanMuscles(x.Secondary)
+			m.PrimaryMuscle=""
+			m.SecondaryMuscles=nil // prevent migration from reviving stale manual synergists
 			beforeMajor:=strings.Join(m.MajorMuscles,"|")
 			beforeSecondary:=strings.Join(m.SupportingMuscles,"|")
 			m.MajorMuscles,m.SupportingMuscles=sanitizeAutomaticPress(old.ExerciseTitle,m.MajorMuscles,m.SupportingMuscles)
@@ -1968,6 +1970,8 @@ func (a *App) handler() http.Handler {
 				len(old.MajorMuscles)!=1 || old.MajorMuscles[0]!="Unmapped" {
 				old.MajorMuscles=[]string{"Unmapped"}
 				old.SupportingMuscles=[]string{}
+				old.PrimaryMuscle=""
+				old.SecondaryMuscles=nil
 				old.AnatomySource="wger: no reliable match"
 				old.AnatomyConfidence="unmapped"
 				old.AnatomyMatched=""
