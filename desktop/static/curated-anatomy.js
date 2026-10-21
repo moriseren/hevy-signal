@@ -18,7 +18,7 @@
   [/^(?:chest press|machine chest press)(?: machine)?$/,['Chest'],['Triceps','Front delts'],'Conventional horizontal chest press'],
   [/^(?:shoulder press|dumbbell shoulder press)(?: dumbbell)?$/,['Front delts','Side delts'],['Triceps'],'Overhead press; the triceps extend the elbow'],
   [/^(?:hip adduction|adduction|machine hip adduction)(?: machine)?$/,['Adductors'],[],'Hip adduction, not glute abduction'],
-  [/^(?:cable abduction|hip abduction|machine hip abduction|abduction)(?: cable|machine)?$/,['Glute med/min'],['Glute max'],'Hip abduction; hip and torso position can change emphasis'],
+  [/^(?:cable abduction|hip abduction|machine hip abduction|abduction)(?: cable| machine)?$/,['Glute med/min'],['Glute max'],'Hip abduction; hip and torso position can change emphasis'],
   [/^(?:hip thrust|machine hip thrust)(?: machine)?$/,['Glute max'],['Hamstrings'],'Hip extension; glute maximus is prime mover'],
   [/^(?:lateral raise|cable lateral raise)(?: cable)?$/,['Side delts'],['Upper traps'],'Shoulder abduction'],
   [/^(?:leg extension|machine leg extension)(?: machine)?$/,['Quads'],[],'Knee extension, rectus femoris and vasti counted within quads'],
