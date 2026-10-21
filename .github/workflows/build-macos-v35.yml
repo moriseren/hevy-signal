@@ -26,7 +26,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23.2'
-      - name: Recover official v3.2 desktop source and apply v3.4 patch
+      - name: Recover original source and apply v3.5 corrections
         shell: bash
         run: |
           set -euo pipefail
@@ -70,8 +70,8 @@ jobs:
           <key>CFBundleName</key><string>Hevy Signal</string>
           <key>CFBundleDisplayName</key><string>Hevy Signal</string>
           <key>CFBundleIdentifier</key><string>app.hevysignal.local</string>
-          <key>CFBundleVersion</key><string>3.4</string>
-          <key>CFBundleShortVersionString</key><string>3.4</string>
+          <key>CFBundleVersion</key><string>3.5</string>
+          <key>CFBundleShortVersionString</key><string>3.5</string>
           <key>CFBundleExecutable</key><string>HevySignal</string>
           <key>CFBundlePackageType</key><string>APPL</string>
           <key>LSMinimumSystemVersion</key><string>11.0</string>
@@ -94,7 +94,7 @@ jobs:
             dist/*.zip
             dist/Hevy-Signal-v3.5-SHA256.txt
           if-no-files-found: error
-      - name: Publish macOS v3.4 release
+      - name: Publish macOS v3.5 release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
