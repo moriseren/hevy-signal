@@ -15,7 +15,7 @@ permissions:
   contents: write
 concurrency:
   group: desktop-v35-release
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
