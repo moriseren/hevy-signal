@@ -17,7 +17,7 @@ jobs:
       - name: Download released source
         shell: bash
         run: |
-          curl -fLsS --retry 3 -o /tmp/source.zip "https://github.com/moriseren/hevy-signal/releases/download/v3.2/Hevy-Signal-v3.3-source.zip"
+          curl -fLsS --retry 3 -o /tmp/source.zip "https://github.com/moriseren/hevy-signal/releases/download/v3.2/Hevy-Signal-v3.2-source.zip"
           unzip -l /tmp/source.zip | head -65
           mkdir -p /tmp/hevy-src
           unzip -q /tmp/source.zip -d /tmp/hevy-src
@@ -25,6 +25,7 @@ jobs:
           find /tmp/hevy-src -maxdepth 4 -type f | head -90
           echo '=== GO MODULES / BUILD / MUSCLE CODE ==='
           find /tmp/hevy-src -type f \( -name "*.go" -o -name "go.mod" -o -name "*.sh" \) | head -60
+          python3 "$GITHUB_WORKSPACE/scripts/patch-desktop-v33.py" /tmp/hevy-src/Hevy-Signal-v3.2-source
           cd /tmp/hevy-src/Hevy-Signal-v3.2-source
           echo '=== MAIN 95-205 ==='; sed -n '95,205p' main.go
           echo '=== MAIN 710-825 ==='; sed -n '710,825p' main.go
