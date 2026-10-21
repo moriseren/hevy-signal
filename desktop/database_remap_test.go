@@ -75,3 +75,13 @@ func TestMissingReferenceDoesNotCountTowardHypertrophyVolume(t *testing.T){
  counts,_:=a.currentRoutineStimulus(14)
  if len(counts)!=0 {t.Fatalf("unverified anatomy included in volume: %+v",counts)}
 }
+
+func TestPublicWgerProxyRejectsBadPaginationBeforeOutboundRequests(t *testing.T){
+ a:=folderTestApp(t)
+ for _,query:=range []string{"?offset=-1","?offset=999999","?limit=0","?limit=500","?offset=not-number"}{
+  req:=httptest.NewRequest("GET","/api/reference/wger/exerciseinfo"+query,nil)
+  res:=httptest.NewRecorder()
+  a.handler().ServeHTTP(res,req)
+  if res.Code!=400{t.Fatalf("bad catalog page should not trigger network: %q -> %d",query,res.Code)}
+ }
+}
