@@ -48,8 +48,31 @@ func hasMuscle(parts []string,canonical string) bool {
 }
 // Applies only to automatically generated mappings. A user's manually saved
 // classifications remain unchanged, even when Signal suggests reviewing them.
+// Keep quadriceps subdivisions as a single group in auto-derived exercise
+// anatomy, not only in the summary math. Manual anatomical notes remain intact.
+func canonicalAutoParts(major,secondary []string) ([]string,[]string) {
+ cleanedPrimary:=[]string{}
+ primary:=map[string]bool{}
+ for _,p:=range major {
+  label:=p
+  if canonicalVolumeMuscle(p)=="Quads" {label="Quads"}
+  if label==""||primary[label] {continue}
+  primary[label]=true
+  cleanedPrimary=append(cleanedPrimary,label)
+ }
+ cleanedSecondary:=[]string{}
+ seen:=map[string]bool{}
+ for _,p:=range secondary {
+  label:=p
+  if canonicalVolumeMuscle(p)=="Quads" {label="Quads"}
+  if label==""||primary[label]||seen[label] {continue}
+  seen[label]=true
+  cleanedSecondary=append(cleanedSecondary,label)
+ }
+ return cleanedPrimary,cleanedSecondary
+}
 func sanitizeAutomaticPress(title string, major, secondary []string) ([]string,[]string) {
- if !isElbowExtensionPress(title){return major,secondary}
+ if !isElbowExtensionPress(title){return canonicalAutoParts(major,secondary)}
  filtered:=[]string{}
  for _,p:=range secondary {if !strings.Contains(strings.ToLower(p),"bicep"){filtered=append(filtered,p)}}
  if !hasMuscle(major,"Triceps") && !hasMuscle(filtered,"Triceps") {
@@ -58,7 +81,7 @@ func sanitizeAutomaticPress(title string, major, secondary []string) ([]string,[
  if strings.Contains(strings.ToLower(title),"chest press") || strings.Contains(strings.ToLower(title),"bench press") {
   if !hasMuscle(major,"Chest")&&!hasMuscle(filtered,"Chest") {major=append(major,"Chest")}
  }
- return major,filtered
+ return canonicalAutoParts(major,filtered)
 }
 // One exercise set contributes at most one direct set to one canonical group;
 // secondary muscle exposure is modeled at 0.5, never added to an already
