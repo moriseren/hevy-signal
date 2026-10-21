@@ -1,0 +1,43 @@
+name: Publish verified v3.5 Mac builds
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/republish-macos-v35.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download final tested binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 39524474927 -R moriseren/hevy-signal -n Hevy-Signal-v3.5-macOS -D dist
+          ls -lah dist
+          cd dist
+          sha256sum -c Hevy-Signal-v3.5-SHA256.txt
+      - name: Replace interim v3.5 binaries with final tested version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload v3.5 -R moriseren/hevy-signal --clobber \
+            dist/Hevy-Signal-v3.5-macOS-Apple-Silicon.zip \
+            dist/Hevy-Signal-v3.5-macOS-Intel.zip \
+            dist/Hevy-Signal-v3.5-source.zip \
+            dist/Hevy-Signal-v3.5-SHA256.txt
+          gh release edit v3.5 -R moriseren/hevy-signal \
+            --title "Hevy Signal v3.5 — Corrected Anatomy and Volume Analysis" \
+            --notes "Verified final v3.5 build (GitHub Actions run 39524474927). Corrects triceps contributions to chest/shoulder presses in automatically generated mappings, unifies quadriceps/rectus femoris/vasti counts, and gives loaded carries and walking non-repetition tracking instead of rep/e1RM advice. Suspected cable abduction/kickback setup changes with >2.25-fold logged load discontinuity are blocked from misleading progression analysis until checked. Manually entered muscle mappings remain protected; errors in manual presses show review warnings. The Hevy CSV does not capture reliable duration/distance for walking/carries, so values are not invented. Both Intel and Apple Silicon binaries compiled and all existing and new Go tests passed. Unsigned Mac beta: macOS may require Control-click then Open on first launch."
+          gh release view v3.5 -R moriseren/hevy-signal --json assets,tagName
