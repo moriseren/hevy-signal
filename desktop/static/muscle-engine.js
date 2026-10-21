@@ -7,11 +7,11 @@
   root.HevyMuscles=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
-  const WGER='https://wger.de/api/v2/exerciseinfo/';
+  const WGER='/api/reference/wger/exerciseinfo';
   const EDB='https://oss.exercisedb.dev/api/v1/exercises';
   const OVERRIDE_KEY='hevy-signal-muscle-profiles-v2';
   const OLD_KEY='hevy-signal-muscle-overrides-v2';
-  const CACHE_KEY='hevy-signal-wger-v3';
+  const CACHE_KEY='hevy-signal-wger-v4';
   let wger=[],edb=[],status='Local classification only',onlineError='';
   const mayStore=typeof localStorage!=='undefined';
   const read=(key,fallback)=>{if(!mayStore)return fallback;try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
@@ -250,8 +250,9 @@
         const items=[];let url=WGER+'?language=2&limit=100&offset=0';let page=0,truncated=false;
         while(url&&page<30){const data=await timeoutFetch(url);if(!data||!Array.isArray(data.results))throw Error('Unexpected wger API response');items.push(...data.results.map(convertWger).filter(Boolean));page++;
           if(data.next && page>=30){truncated=true;url=null;}
-          else url=data.next?new URL(data.next,WGER).href:null;
-          if(url&&!url.startsWith('https://wger.de/'))throw Error('Unexpected pagination host');
+          else if(data.next){const next=new URL(data.next,'https://wger.de');if(next.hostname!=='wger.de')throw Error('Unexpected wger pagination host');url=WGER+'?'+next.searchParams.toString();}
+          else url=null;
+          if(url&&!url.startsWith(WGER+'?'))throw Error('Unexpected pagination URL');
         }
         if(!items.length)throw Error('No English exercises returned');
         wger=items;write(CACHE_KEY,{when:Date.now(),rows:items});
