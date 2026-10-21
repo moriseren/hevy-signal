@@ -25,4 +25,13 @@ jobs:
           find /tmp/hevy-src -maxdepth 4 -type f | head -90
           echo '=== GO MODULES / BUILD / MUSCLE CODE ==='
           find /tmp/hevy-src -type f \( -name "*.go" -o -name "go.mod" -o -name "*.sh" \) | head -60
-          grep -RinE 'func .*muscle|Unmapped|MajorMuscles|major_muscles|SupportingMuscles|supporting_muscles|GOOS=darwin|go build' /tmp/hevy-src --include='*.go' --include='*.sh' --include='*.md' | head -85 || true
+          cd /tmp/hevy-src/Hevy-Signal-v3.2-source
+          echo '=== MAIN 95-205 ==='; sed -n '95,205p' main.go
+          echo '=== MAIN 710-825 ==='; sed -n '710,825p' main.go
+          echo '=== MAIN 1350-1480 ==='; sed -n '1350,1480p' main.go
+          echo '=== MAIN 1550-1720 ==='; sed -n '1550,1720p' main.go
+          echo '=== LAUNCHER ==='; head -100 cmd/macos-launcher/main.go
+          echo '=== FRONTEND BINDINGS ==='; grep -nE 'unmapped|major_muscles|supporting_muscles|exportMappings|importMappings|async function|const .*muscle' static/app.js | head -55
+          echo '=== BUILD INSTRUCTIONS ==='; cat README-FIRST.txt
+          echo '=== GO ENVS ==='; ls -la; head -40 README.md
+
