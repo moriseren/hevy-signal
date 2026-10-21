@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const expectedVersion = "3.6-folder-programs"
+const expectedVersion = "3.7-database-muscles"
 
 type health struct {
 	OK      bool   `json:"ok"`
