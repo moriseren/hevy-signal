@@ -7,7 +7,7 @@ on:
       - 'scripts/remap-v34-tests.go'
       - 'scripts/desktop-auto-map-v34.js'
       - 'docs/muscle-engine.js'
-      - '.github/workflows/build-macos-v33.yml'
+      - '.github/workflows/build-macos-v34.yml'
   workflow_dispatch:
 permissions:
   contents: write
@@ -106,4 +106,4 @@ jobs:
             dist/Hevy-Signal-v3.4-source.zip \
             dist/Hevy-Signal-v3.4-SHA256.txt \
             --title "Hevy Signal v3.4 — Refresh All Automatic Muscle Classifications" \
-            --notes "Unsigned Mac beta builds for Apple Silicon and Intel. Repairs old unmapped exercises on launch without overwriting customized muscle assignments; includes new movement rules, in-app remapping controls and optional wger exercise reference matching. Hevy history and settings remain at ~/.hevy-signal. Technique-specific classifications are estimates and should be reviewed. Save a backup of your exercise mappings before upgrading. Built and Go-tested from the published v3.2 source and the repository's v3.4 patch."
+            --notes "Re-evaluates ALL automatically assigned muscle groups on startup, not only unmapped exercises. Safeguards deliberately edited muscle groups, execution variants, and progression settings. Recognizes older v3.3 automatic entries mistakenly marked manual. In-app Re-map all automatic exercises control optionally checks exact wger reference matches. Copies the previous data file to ~/.hevy-signal/data-before-v3.4-remap.json. Anatomical classifications based on exercise names are estimates; review special variants. Unsigned Mac beta; you may need Control-click then Open."
