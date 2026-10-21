@@ -28,7 +28,7 @@ import (
 var staticFS embed.FS
 
 const baseURL = "https://api.hevyapp.com/v1"
-const version = "3.7-database-muscles"
+const version = "3.8-anatomy-coverage"
 
 type Config struct {
 	HevyAPIKey string `json:"hevy_api_key"`
@@ -898,7 +898,7 @@ func (a *App) importHevyCSV(r io.Reader) (int, int, int, error) {
 // v3.3's browser catalog accidentally marked machine-generated classifications
 // as manual, recognizable by its distinctive Movement marker.
 func isAutoEditable(m Meta) bool {
-	if strings.HasPrefix(m.AnatomySource,"wger") || m.AnatomyNeedsReview {return false}
+	if strings.HasPrefix(m.AnatomySource,"wger") || strings.HasPrefix(m.AnatomySource,"Biomechanics crosswalk") || m.AnatomyNeedsReview {return false}
 	unknown := len(m.MajorMuscles) == 0 ||
 		(len(m.MajorMuscles) == 1 && strings.EqualFold(strings.TrimSpace(m.MajorMuscles[0]), "Unmapped"))
 	defaultUnknown := unknown && (m.Movement == "" || m.Movement == "Unmapped")
@@ -1167,7 +1167,7 @@ func canonicalVolumeMuscle(s string) string {
 }
 func isWalkingTitle(title string) bool {
 	t := strings.ToLower(strings.TrimSpace(title))
-	return t == "walking" || t == "walk" || strings.HasPrefix(t, "treadmill walk") || strings.HasPrefix(t, "brisk walk")
+	return t == "walking" || t == "walk" || t == "treadmill" || strings.HasPrefix(t, "treadmill walk") || strings.HasPrefix(t, "treadmill running") || strings.HasPrefix(t, "brisk walk")
 }
 func isCarryTitle(title string) bool {
 	t := strings.ToLower(strings.TrimSpace(title))
@@ -1931,9 +1931,9 @@ func (a *App) handler() http.Handler {
 		suggested:=map[string]Meta{}
 		for _,x:=range req.Suggestions {
 			old,ok:=a.store.Meta[x.TemplateID]
-			if !ok||x.Source!="wger"||x.Confidence!="high"||len(x.Primary)==0||len(x.Primary)>12||len(x.Secondary)>20 {continue}
+			if !ok||len(x.Primary)==0||len(x.Primary)>12||len(x.Secondary)>20||!((x.Source=="wger"&&x.Confidence=="high")||(x.Source=="curated"&&x.Confidence=="curated")) {continue}
 			if !strings.EqualFold(strings.TrimSpace(old.ExerciseTitle),strings.TrimSpace(x.ExerciseTitle)) {continue}
-			if strings.TrimSpace(x.Matched)=="" {continue}
+			if strings.TrimSpace(x.Matched)=="" || (x.Source=="curated"&&!strings.EqualFold(strings.TrimSpace(x.Matched),strings.TrimSpace(old.ExerciseTitle))) {continue}
 			// Source matched title may differ from Hevy title by normalized
 			// equipment terms; client enforces variation and ambiguity checks.
 			m:=old
@@ -1946,17 +1946,24 @@ func (a *App) handler() http.Handler {
 			m.MajorMuscles,m.SupportingMuscles=sanitizeAutomaticPress(old.ExerciseTitle,m.MajorMuscles,m.SupportingMuscles)
 			if len(m.MajorMuscles)==0 {continue}
 			m.AnatomySource="wger"
-			if strings.Join(m.MajorMuscles,"|")!=beforeMajor||strings.Join(m.SupportingMuscles,"|")!=beforeSecondary {m.AnatomySource="wger + biomechanical normalization"}
-			m.AnatomyConfidence="high"
+            m.AnatomyConfidence="high"
+            if x.Source=="curated" {
+                m.AnatomySource="Biomechanics crosswalk (not wger)"
+                m.AnatomyConfidence="estimated"
+            } else if strings.Join(m.MajorMuscles,"|")!=beforeMajor||
+                strings.Join(m.SupportingMuscles,"|")!=beforeSecondary {
+                m.AnatomySource="wger + biomechanical normalization"
+            }
 			m.AnatomyMatched=x.Matched
 			m.AnatomyNeedsReview=false
 			m.AutoTagged=true
 			suggested[x.TemplateID]=normalizeMeta(m)
 		}
-		changed,matched,needsReview:=0,0,0
+		changed,matched,needsReview,wgerMapped,curatedMapped:=0,0,0,0,0
 		for tid,old:=range a.store.Meta {
 			if update,ok:=suggested[tid];ok {
 				matched++
+                if strings.HasPrefix(update.AnatomySource,"wger"){wgerMapped++}else{curatedMapped++}
 				if strings.Join(old.MajorMuscles,"|")!=strings.Join(update.MajorMuscles,"|")||
 					strings.Join(old.SupportingMuscles,"|")!=strings.Join(update.SupportingMuscles,"|")||
 					old.AnatomySource!=update.AnatomySource||old.AnatomyNeedsReview {
@@ -1982,8 +1989,8 @@ func (a *App) handler() http.Handler {
 			}
 		}
 		if changed>0 {if err:=a.saveStore();err!=nil {writeJSON(w,500,map[string]any{"error":"Could not save database mappings: "+err.Error()});return}}
-		writeJSON(w,200,map[string]any{"ok":true,"checked":len(a.store.Meta),"matched":matched,
-			"needsReview":needsReview,"changed":changed,"source":"wger","allPreviousMappingsRechecked":true})
+		writeJSON(w,200,map[string]any{"ok":true,"checked":len(a.store.Meta),"matched":matched,"wgerMapped":wgerMapped,"curatedMapped":curatedMapped,
+			"needsReview":needsReview,"changed":changed,"source":"wger + biomechanics crosswalk","allPreviousMappingsRechecked":true})
 	})
 
 	mux.HandleFunc("/api/auto-remap", func(w http.ResponseWriter, r *http.Request) {

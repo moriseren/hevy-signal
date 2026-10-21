@@ -3,7 +3,6 @@ on:
   push:
     branches: [main]
     paths:
-      - 'desktop/**'
       - '.github/workflows/build-macos-v37.yml'
   workflow_dispatch:
 permissions:
