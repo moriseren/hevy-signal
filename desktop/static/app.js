@@ -43,7 +43,7 @@ async function importCsvFile(file){
  try{
   const fd=new FormData(); fd.append('file',file);
   const r=await fetch('/api/import-hevy-csv',{method:'POST',body:fd}); const text=await r.text(); let j={}; try{j=JSON.parse(text)}catch(_){throw Error('Local app returned an unreadable CSV import response.')}; if(!r.ok)throw Error(j.error||`HTTP ${r.status}`);
-  msg.textContent=`Imported ${j.workouts} workouts and ${j.sets} working sets. Current program inferred from ${j.routines} recent workout templates.`;
+  msg.textContent=`Imported ${j.workouts} workouts with ${j.sets} completed rep-based working sets. Current program inferred from ${j.routines} recent workout templates.`;
   onboardingDialog?.close(); $('#settingsDialog')?.close(); await loadConfig(); await load();
  }catch(e){msg.textContent='CSV import failed: '+e.message}
 }

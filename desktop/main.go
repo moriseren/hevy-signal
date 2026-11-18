@@ -28,7 +28,7 @@ import (
 var staticFS embed.FS
 
 const baseURL = "https://api.hevyapp.com/v1"
-const version = "3.8-anatomy-coverage"
+const version = "3.9-completed-sets"
 
 type Config struct {
 	HevyAPIKey string `json:"hevy_api_key"`
@@ -48,6 +48,23 @@ type SetRow struct {
 	HasReps       bool    `json:"has_reps"`
 	RPE           float64 `json:"rpe"`
 	HasRPE        bool    `json:"has_rpe"`
+}
+
+// A logged rep-based working set must contain an actual positive rep count.
+// Weight is optional (e.g. bodyweight exercises). Warmups are excluded at import.
+// Apply this at analysis time as well, so existing saved history is protected.
+func (r SetRow) completedRepSet() bool {
+	return r.HasReps && r.Reps > 0
+}
+
+func completedRepSetCount(rows []SetRow) int {
+	n := 0
+	for _, r := range rows {
+		if r.completedRepSet() {
+			n++
+		}
+	}
+	return n
 }
 
 type Meta struct {
@@ -844,7 +861,7 @@ func (a *App) importHevyCSV(r io.Reader) (int, int, int, error) {
 			break
 		}
 		key := strings.ToLower(strings.TrimSpace(cw.Title))
-		if seenTitles[key] {
+		if seenTitles[key] || completedRepSetCount(cw.Rows) == 0 {
 			continue
 		}
 		seenTitles[key] = true
@@ -852,6 +869,9 @@ func (a *App) importHevyCSV(r io.Reader) (int, int, int, error) {
 		perEx := map[string][]SetRow{}
 		exOrder := []string{}
 		for _, sr := range cw.Rows {
+			if !sr.completedRepSet() {
+				continue
+			}
 			if _, ok := perEx[sr.TemplateID]; !ok {
 				exOrder = append(exOrder, sr.TemplateID)
 			}
@@ -886,12 +906,14 @@ func (a *App) importHevyCSV(r io.Reader) (int, int, int, error) {
 			rs.Exercises = append(rs.Exercises, RoutineExercise{TemplateID: tid, ExerciseTitle: rows[0].ExerciseTitle, SetCount: len(rows), RepTargets: rt})
 			a.store.CurrentRoutineExercises[tid] = true
 		}
-		a.store.Routines = append(a.store.Routines, rs)
+		if len(rs.Exercises) > 0 {
+			a.store.Routines = append(a.store.Routines, rs)
+		}
 	}
 	if err := a.saveStore(); err != nil {
 		return 0, 0, 0, err
 	}
-	return len(workouts), len(a.store.Sets), len(a.store.Routines), nil
+	return len(workouts), completedRepSetCount(a.store.Sets), len(a.store.Routines), nil
 }
 
 // isAutoEditable protects explicitly saved manual muscle classifications.
@@ -1091,7 +1113,7 @@ func summary(rows []SetRow) SessionSummary {
 func (a *App) sessionsFor(tid string, limit int) [][]SetRow {
 	rows := []SetRow{}
 	for _, s := range a.store.Sets {
-		if s.TemplateID == tid && a.isSelectedWorkoutSetLocked(s) {
+		if s.completedRepSet() && s.TemplateID == tid && a.isSelectedWorkoutSetLocked(s) {
 			rows = append(rows, s)
 		}
 	}
@@ -1410,6 +1432,9 @@ func (a *App) stimulus(days int) ([]map[string]any, map[string]map[string]float6
 	mus := map[string]float64{}
 	stim := map[string]map[string]float64{}
 	for _, r := range a.store.Sets {
+		if !r.completedRepSet() {
+			continue
+		}
 		t, ok := parseTime(r.PerformedAt)
 		if ok && t.Before(cut) {
 			continue
@@ -1458,6 +1483,9 @@ func (a *App) currentRoutineStimulus(days int) ([]map[string]any, map[string]map
 	mus := map[string]float64{}
 	stim := map[string]map[string]float64{}
 	for _, r := range a.store.Sets {
+		if !r.completedRepSet() {
+			continue
+		}
 		if !a.isSelectedWorkoutSetLocked(r) {continue}
 		if !a.store.CurrentRoutineExercises[r.TemplateID] {
 			continue
@@ -1642,6 +1670,7 @@ func (a *App) evidence(q string, history []ChatTurn) map[string]any {
 				}
 				return "The current Hevy routines define the active program; historical exercises outside them are context only."
 			}(),
+			"Only logged non-warmup sets with positive completed reps count toward rep-based history, progression and muscle exposure; routine targets are not evidence of completion.",
 			"Major-contributor sets count as 1.0 for every major muscle; supporting-contributor sets count as 0.5 in muscle-set summaries.",
 			"Execution variants should not be compared as if they are the same lift when setup materially changes leverage or recruitment.",
 			"A single down exposure never triggers a program rewrite.",
@@ -1737,7 +1766,7 @@ func (a *App) chatGPTBrief() string {
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("## Interpretation rules\n\n- Canonical muscle groups are counted once per set (rectus femoris and vasti belong to quads); supporting exposures count at an optional 0.5 modeling weight, not a validated hypertrophy equivalence. Carries and walking do not count as standard lifting sets.\n- Execution variants should not share a strength baseline if setup materially changes leverage or recruitment.\n- Load×reps and estimated 1RM are performance context, not direct hypertrophy measures.\n- Signal labels are deterministic guardrails, not coaching conclusions.\n")
+	b.WriteString("## Interpretation rules\n\n- Only logged non-warmup sets with positive completed reps count toward rep-based history, progression and muscle exposure. Routine targets are not completed sets; blank or zero-rep entries are excluded.\n- Canonical muscle groups are counted once per set (rectus femoris and vasti belong to quads); supporting exposures count at an optional 0.5 modeling weight, not a validated hypertrophy equivalence. Carries and walking do not count as standard lifting sets.\n- Execution variants should not share a strength baseline if setup materially changes leverage or recruitment.\n- Load×reps and estimated 1RM are performance context, not direct hypertrophy measures.\n- Signal labels are deterministic guardrails, not coaching conclusions.\n")
 	return b.String()
 }
 
@@ -1827,7 +1856,7 @@ func (a *App) handler() http.Handler {
 				unmapped++
 			}
 		}
-		writeJSON(w, 200, map[string]any{"recs": recs, "routines": a.selectedRoutinesLocked(), "activeFolderId":a.store.ActiveFolderID,"activeFolderName":a.selectedFolderTitleLocked(), "counts": map[string]any{"workouts": len(a.store.WorkoutIDs), "sets": len(a.store.Sets), "unmapped": unmapped, "routines": len(a.selectedRoutinesLocked()), "routineExercises": len(a.store.CurrentRoutineExercises)}, "muscle": mus, "stimulus": stim, "hevyConfigured": strings.TrimSpace(a.cfg.HevyAPIKey) != "", "programSource": a.store.ProgramSource})
+		writeJSON(w, 200, map[string]any{"recs": recs, "routines": a.selectedRoutinesLocked(), "activeFolderId":a.store.ActiveFolderID,"activeFolderName":a.selectedFolderTitleLocked(), "counts": map[string]any{"workouts": len(a.store.WorkoutIDs), "sets": completedRepSetCount(a.store.Sets), "unmapped": unmapped, "routines": len(a.selectedRoutinesLocked()), "routineExercises": len(a.store.CurrentRoutineExercises)}, "muscle": mus, "stimulus": stim, "hevyConfigured": strings.TrimSpace(a.cfg.HevyAPIKey) != "", "programSource": a.store.ProgramSource})
 	})
 	mux.HandleFunc("/api/program-folders",func(w http.ResponseWriter,r *http.Request){
   if r.Method!="GET" {writeJSON(w,405,map[string]any{"error":"GET required"});return}

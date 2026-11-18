@@ -1,0 +1,110 @@
+name: Build Hevy Signal v3.9 for macOS
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/build-macos-v39.yml'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/build-macos-v39.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: hevy-desktop-v39-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.2'
+      - name: Test desktop source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd desktop
+          node --check static/app.js
+          node --check static/auto-map.js
+          node --check static/muscle-engine.js
+          GO111MODULE=off CGO_ENABLED=0 go test -v ./...
+          node database_engine.test.cjs
+          node curated_anatomy.test.cjs
+          GO111MODULE=off CGO_ENABLED=0 go vet ./...
+      - name: Build Apple Silicon and Intel Mac bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd desktop
+          for spec in arm64:Apple-Silicon amd64:Intel; do
+            ARCH="${spec%%:*}"
+            LABEL="${spec#*:}"
+            STAGING="$GITHUB_WORKSPACE/dist/$LABEL"
+            APP="$STAGING/Hevy Signal.app"
+            mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+            GO111MODULE=off CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" \
+              go build -trimpath -o "$APP/Contents/Resources/HevySignalBackend" main.go
+            GO111MODULE=off CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" \
+              go build -trimpath -o "$APP/Contents/MacOS/HevySignal" cmd/macos-launcher/main.go
+            chmod +x "$APP/Contents/MacOS/HevySignal" "$APP/Contents/Resources/HevySignalBackend"
+            cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>CFBundleName</key><string>Hevy Signal</string>
+          <key>CFBundleDisplayName</key><string>Hevy Signal</string>
+          <key>CFBundleIdentifier</key><string>app.hevysignal.local</string>
+          <key>CFBundleVersion</key><string>3.9</string>
+          <key>CFBundleShortVersionString</key><string>3.9</string>
+          <key>CFBundleExecutable</key><string>HevySignal</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>LSMinimumSystemVersion</key><string>11.0</string>
+          <key>LSUIElement</key><true/>
+          <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          PLIST
+            (cd "$STAGING" && zip -qry "$GITHUB_WORKSPACE/dist/Hevy-Signal-v3.9-macOS-$LABEL.zip" "Hevy Signal.app")
+            file "$APP/Contents/"{MacOS/HevySignal,Resources/HevySignalBackend}
+          done
+          cd "$GITHUB_WORKSPACE"
+          zip -qry "dist/Hevy-Signal-v3.9-source.zip" desktop
+          cd dist
+          sha256sum Hevy-Signal-v3.9-*.zip > Hevy-Signal-v3.9-SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hevy-Signal-v3.9-macOS
+          path: |
+            dist/*.zip
+            dist/Hevy-Signal-v3.9-SHA256.txt
+          if-no-files-found: error
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Hevy-Signal-v3.9-macOS
+          path: dist
+      - name: Publish passing v3.9 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c Hevy-Signal-v3.9-SHA256.txt
+          if gh release view v3.9 >/dev/null 2>&1; then
+            echo 'v3.9 already published; keeping original release assets.'
+            exit 0
+          fi
+          gh release create v3.9 Hevy-Signal-v3.9-*.zip Hevy-Signal-v3.9-SHA256.txt \
+            --target "$GITHUB_SHA" \
+            --title 'Hevy Signal v3.9 — Completed-set safeguard' \
+            --notes 'Only logged non-warmup sets with positive reps count toward rep-based history, progression, and estimated hypertrophy volume. Bodyweight sets still count; blank, zero and negative rep entries do not. Previously stored history and mappings are preserved. Saved Hevy routine targets remain separate from completed volume. Reimport CSV to refresh previously inferred routine cards. Preserves v3.8 anatomy mapping and folder selection. Unsigned beta; first macOS launch may require Control-click then Open.'
