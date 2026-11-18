@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.9 Public Beta (Mac)
+
+- Only non-warmup logged sets with at least one recorded rep count toward rep-based exercise history, progression signals, stimulus and muscle-volume totals. Zero, missing and negative rep entries are excluded, even when they contain weight or RPE.
+- Bodyweight and other unweighted sets with positive reps remain valid. No change to saved Hevy routine prescriptions, exercise anatomy, program-folder selection, or local data.
+- The safeguard applies to previously synced/imported history without deleting anything. New CSV imports infer routine cards using completed rep-based sets; reimport a CSV to refresh previously inferred cards.
+
 ## v3.2 Public Beta
 
 - Added **local Hevy workout CSV import** so Hevy Pro is no longer required.

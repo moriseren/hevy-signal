@@ -4,13 +4,15 @@ Hevy Signal is a local training-analysis companion for Hevy. Hevy remains your w
 
 > Public beta. Independent project; not affiliated with or endorsed by Hevy.
 
-## Download — v3.8 Mac desktop
+## Download — v3.9 Mac desktop
 
-**[Hevy Signal v3.8 — corrected muscle anatomy and coverage](https://github.com/moriseren/hevy-signal/releases/tag/v3.8)**
+**[Hevy Signal v3.9 — completed-set safeguard](https://github.com/moriseren/hevy-signal/releases/tag/v3.9)**
 
-- [Apple Silicon Mac (M1, M2, M3, M4 and newer)](https://github.com/moriseren/hevy-signal/releases/download/v3.8/Hevy-Signal-v3.8-macOS-Apple-Silicon.zip)
-- [Intel Mac](https://github.com/moriseren/hevy-signal/releases/download/v3.8/Hevy-Signal-v3.8-macOS-Intel.zip)
-- [Source and checksums](https://github.com/moriseren/hevy-signal/releases/tag/v3.8)
+- [Apple Silicon Mac (M1, M2, M3, M4 and newer)](https://github.com/moriseren/hevy-signal/releases/download/v3.9/Hevy-Signal-v3.9-macOS-Apple-Silicon.zip)
+- [Intel Mac](https://github.com/moriseren/hevy-signal/releases/download/v3.9/Hevy-Signal-v3.9-macOS-Intel.zip)
+- [Source and checksums](https://github.com/moriseren/hevy-signal/releases/tag/v3.9)
+
+**Completed-set safeguard:** Signal's rep-based exercise history, progression and muscle-volume estimates now require a recorded positive rep count in a logged workout set. Warmups and blank, zero or negative rep entries never earn set credit; bodyweight sets with positive reps still count. Saved routine targets are not completed sets. This applies to existing history without deleting any records or requiring a resync. In CSV mode, reimport to also refresh previously inferred routine cards. Time-only activities do not receive rep-based set credit.
 
 ### Correctly classify more real Hevy movements
 
@@ -29,7 +31,7 @@ The v3.6+ Hevy **Cut / Hypertrophy program-folder selector** is retained. Changi
 
 To upgrade, quit your old Hevy Signal, unzip the Mac architecture-specific download, and replace Hevy Signal.app in Applications. Existing data and Hevy API settings stay under `~/.hevy-signal`. This is an **unsigned** beta; macOS may require Control-click → Open on first launch. The GitHub tests and Mac cross-compilation passed; graphical launch and live-provider matching must still be verified on macOS.
 
-Previous releases: [v3.7](https://github.com/moriseren/hevy-signal/releases/tag/v3.7), [v3.6](https://github.com/moriseren/hevy-signal/releases/tag/v3.6).
+Previous releases: [v3.8](https://github.com/moriseren/hevy-signal/releases/tag/v3.8), [v3.7](https://github.com/moriseren/hevy-signal/releases/tag/v3.7), [v3.6](https://github.com/moriseren/hevy-signal/releases/tag/v3.6).
 
 ## iPhone / mobile web app
 
